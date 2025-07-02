@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  
+  body {
+    @apply bg-gray-50 text-gray-900;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-production-600 hover:bg-production-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 font-medium;
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg transition-colors duration-200 font-medium;
+  }
+  
+  .btn-success {
+    @apply bg-wrap-600 hover:bg-wrap-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 font-medium;
+  }
+  
+  .btn-danger {
+    @apply bg-alert-600 hover:bg-alert-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 font-medium;
+  }
+  
+  .status-badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+  
+  .status-setup {
+    @apply status-badge bg-gray-100 text-gray-800;
+  }
+  
+  .status-rehearsal {
+    @apply status-badge bg-onset-100 text-onset-800;
+  }
+  
+  .status-rolling {
+    @apply status-badge bg-alert-100 text-alert-800 animate-pulse-slow;
+  }
+  
+  .status-completed {
+    @apply status-badge bg-wrap-100 text-wrap-800;
+  }
+  
+  .live-indicator {
+    @apply inline-block w-2 h-2 bg-alert-500 rounded-full animate-live-indicator;
+  }
+  
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-gray-200 p-6;
+  }
+  
+  .card-header {
+    @apply flex items-center justify-between mb-4;
+  }
+  
+  .input-field {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-production-500 focus:border-transparent;
+  }
+  
+  .select-field {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-production-500 focus:border-transparent bg-white;
+  }
+}

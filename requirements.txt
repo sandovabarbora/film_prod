@@ -1,0 +1,18 @@
+Django==4.2.*
+djangorestframework==3.14.*
+django-cors-headers==4.3.*
+django-extensions==3.2.*
+python-decouple==3.8
+Pillow==10.0.*
+
+# Pro PostgreSQL (volitelné)
+psycopg2-binary==2.9.*
+
+# Pro Redis a WebSockets (volitelné pro MVP)
+redis==5.0.*
+channels==4.0.*
+channels-redis==4.1.*
+
+# Pro testování (volitelné)
+pytest-django==4.5.*
+factory-boy==3.3.*
