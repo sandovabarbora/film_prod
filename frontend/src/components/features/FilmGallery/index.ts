@@ -1,0 +1,1 @@
+export { FilmGallery } from './FilmGallery';

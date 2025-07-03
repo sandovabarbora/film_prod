@@ -21,6 +21,7 @@ THIRD_PARTY_APPS = [
     'rest_framework',
     'corsheaders',
     'channels',
+    'rest_framework_simplejwt',
     'django_extensions',
 ]
 
@@ -44,6 +45,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.common.CommonMiddleware',
 ]
 
 ROOT_URLCONF = 'filmflow.urls'
@@ -116,6 +119,19 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 20,
 }
 
+# JWT Settings
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+}
+
+# Media files
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 # CORS pro Vue.js development
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
