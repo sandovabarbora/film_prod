@@ -30,7 +30,7 @@ const routes = [
     name: 'ProductionAnalytics',
     component: () => import('@/views/analytics/AnalyticsDashboard.vue'),
     meta: { title: 'Production Analytics - FilmFlow' }
-  }
+  },
 ]
 
 const router = createRouter({
