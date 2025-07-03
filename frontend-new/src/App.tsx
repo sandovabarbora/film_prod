@@ -1,9 +1,11 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import styled from 'styled-components';
+import styled, { ThemeProvider } from 'styled-components';
 import { AuthProvider } from './contexts/AuthContext';
-import { Sidebar } from './components/layout/Sidebar';
+import authService from './services/authService';
+import { theme } from './styles/theme';
+import { GlobalStyles } from './styles/GlobalStyles';
 import Header from './components/Header';
 import Dashboard from './pages/Dashboard';
 import Schedule from './pages/Schedule';
@@ -29,41 +31,41 @@ const queryClient = new QueryClient({
 
 const AppContainer = styled.div`
   display: flex;
+  flex-direction: column;
   height: 100vh;
   background: ${({ theme }) => theme.colors.gray[850]};
 `;
 
 const MainContent = styled.div`
   flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
 `;
 
 const ContentArea = styled.main`
-  flex: 1;
-  overflow-y: auto;
+  width: 100%;
+  height: 100%;
   background: ${({ theme }) => theme.colors.gray[850]};
 `;
 
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const isAuth = localStorage.getItem('accessToken');
+// Vylepšený ProtectedRoute používající authService
+const ProtectedRoute: React.FC = () => {
+  const isAuthenticated = authService.isAuthenticated();
   
-  if (!isAuth) {
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
   
-  return <>{children}</>;
+  return <Outlet />;
 };
 
-const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+// Layout komponent s Outlet pro vnořené routes
+const Layout: React.FC = () => {
   return (
     <AppContainer>
-      <Sidebar />
+      <Header />
       <MainContent>
-        <Header />
         <ContentArea>
-          {children}
+          <Outlet />
         </ContentArea>
       </MainContent>
     </AppContainer>
@@ -73,79 +75,37 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <Router>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/join" element={<JoinProduction />} />
-            <Route path="/onboarding" element={<Onboarding />} />
-            
-            <Route path="/" element={
-              <ProtectedRoute>
-                <Layout>
-                  <Dashboard />
-                </Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/schedule" element={
-              <ProtectedRoute>
-                <Layout>
-                  <Schedule />
-                </Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/crew" element={
-              <ProtectedRoute>
-                <Layout>
-                  <Crew />
-                </Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/equipment" element={
-              <ProtectedRoute>
-                <Layout>
-                  <Equipment />
-                </Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/locations" element={
-              <ProtectedRoute>
-                <Layout>
-                  <Locations />
-                </Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/budget" element={
-              <ProtectedRoute>
-                <Layout>
-                  <Budget />
-                </Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/documents" element={
-              <ProtectedRoute>
-                <Layout>
-                  <Documents />
-                </Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/communication" element={
-              <ProtectedRoute>
-                <Layout>
-                  <Communication />
-                </Layout>
-              </ProtectedRoute>
-            } />
-            <Route path="/weather" element={
-              <ProtectedRoute>
-                <Layout>
-                  <Weather />
-                </Layout>
-              </ProtectedRoute>
-            } />
-          </Routes>
-        </Router>
-      </AuthProvider>
+      <ThemeProvider theme={theme}>
+        <GlobalStyles />
+        <AuthProvider>
+          <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            <Routes>
+              {/* Public routes */}
+              <Route path="/login" element={<Login />} />
+              <Route path="/join" element={<JoinProduction />} />
+              <Route path="/onboarding" element={<Onboarding />} />
+              
+              {/* Protected routes */}
+              <Route element={<ProtectedRoute />}>
+                <Route element={<Layout />}>
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/schedule" element={<Schedule />} />
+                  <Route path="/crew" element={<Crew />} />
+                  <Route path="/equipment" element={<Equipment />} />
+                  <Route path="/locations" element={<Locations />} />
+                  <Route path="/budget" element={<Budget />} />
+                  <Route path="/documents" element={<Documents />} />
+                  <Route path="/communication" element={<Communication />} />
+                  <Route path="/weather" element={<Weather />} />
+                </Route>
+              </Route>
+              
+              {/* Catch all - redirect to dashboard */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Router>
+        </AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

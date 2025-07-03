@@ -1,189 +1,210 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import styled from 'styled-components';
-import { Calendar, Users, DollarSign, Clock, TrendingUp, AlertCircle } from 'lucide-react';
-import { useProductions, useProductionDashboard } from '../hooks/useProduction';
+import { Calendar, Users, DollarSign, Film } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
 
-const Container = styled.div`
-  padding: ${({ theme }) => theme.spacing.xl};
-  background: ${({ theme }) => theme.colors.gray[850]};
-  min-height: 100vh;
+const DashboardContainer = styled.div`
+  padding: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  color: ${({ theme }) => theme.colors.text.primary};
 `;
 
-const Header = styled.div`
-  margin-bottom: ${({ theme }) => theme.spacing.xxl};
+const PageHeader = styled.div`
+  margin-bottom: 3rem;
 `;
 
-const Title = styled.h1`
-  font-family: ${({ theme }) => theme.fonts.display};
-  font-size: ${({ theme }) => theme.sizes.h1};
-  color: ${({ theme }) => theme.colors.primary.light};
-  margin-bottom: ${({ theme }) => theme.spacing.sm};
+const PageTitle = styled.h1`
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 `;
 
-const Subtitle = styled.p`
-  color: ${({ theme }) => theme.colors.gray[400]};
-  font-size: ${({ theme }) => theme.sizes.body};
+const PageSubtitle = styled.p`
+  font-size: 1.125rem;
+  color: ${({ theme }) => theme.colors.text.secondary};
 `;
 
 const StatsGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: ${({ theme }) => theme.spacing.lg};
-  margin-bottom: ${({ theme }) => theme.spacing.xxl};
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 3rem;
 `;
 
 const StatCard = styled.div`
-  background: ${({ theme }) => theme.colors.gray[900]};
-  border: 1px solid ${({ theme }) => theme.colors.gray[800]};
+  background: ${({ theme }) => theme.colors.gray[800]};
+  border: 1px solid ${({ theme }) => theme.colors.gray[700]};
   border-radius: 12px;
-  padding: ${({ theme }) => theme.spacing.lg};
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  transition: all ${({ theme }) => theme.transitions.normal};
-
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+  
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: ${({ theme }) => theme.shadows.medium};
-    border-color: ${({ theme }) => theme.colors.gray[700]};
+    transform: translateY(-4px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    border-color: ${({ theme }) => theme.colors.primary};
   }
 `;
 
-const StatContent = styled.div``;
+const StatHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+`;
+
+const StatInfo = styled.div`
+  flex: 1;
+`;
 
 const StatLabel = styled.p`
-  font-size: ${({ theme }) => theme.sizes.small};
-  color: ${({ theme }) => theme.colors.gray[400]};
-  margin-bottom: ${({ theme }) => theme.spacing.xs};
+  font-size: 0.875rem;
+  color: ${({ theme }) => theme.colors.text.secondary};
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 `;
 
-const StatValue = styled.p`
-  font-size: ${({ theme }) => theme.sizes.h3};
+const StatValue = styled.h3`
+  font-size: 2rem;
   font-weight: 700;
-  color: ${({ theme }) => theme.colors.primary.light};
+  color: ${({ theme }) => theme.colors.text.primary};
+  margin: 0;
 `;
 
-const IconWrapper = styled.div<{ color: string }>`
+const StatIcon = styled.div<{ $color: string }>`
   width: 48px;
   height: 48px;
-  background: ${({ color }) => color};
-  border-radius: 8px;
+  border-radius: 12px;
+  background: ${props => props.$color};
   display: flex;
   align-items: center;
   justify-content: center;
-  opacity: 0.9;
+  
+  svg {
+    width: 24px;
+    height: 24px;
+    color: white;
+  }
 `;
 
-const LoadingState = styled.div`
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 400px;
-  color: ${({ theme }) => theme.colors.gray[400]};
+const QuickActions = styled.section`
+  margin-top: 3rem;
 `;
 
-const ErrorState = styled.div`
-  background: ${({ theme }) => theme.colors.status.error}20;
-  border: 1px solid ${({ theme }) => theme.colors.status.error};
+const SectionTitle = styled.h2`
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  color: ${({ theme }) => theme.colors.text.primary};
+`;
+
+const ActionGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+`;
+
+const ActionButton = styled.button`
+  background: ${({ theme }) => theme.colors.gray[800]};
+  border: 1px solid ${({ theme }) => theme.colors.gray[700]};
   border-radius: 8px;
-  padding: ${({ theme }) => theme.spacing.lg};
-  color: ${({ theme }) => theme.colors.status.error};
-  margin: ${({ theme }) => theme.spacing.xl} 0;
+  padding: 1rem;
+  color: ${({ theme }) => theme.colors.text.primary};
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  
+  &:hover {
+    background: ${({ theme }) => theme.colors.gray[700]};
+    border-color: ${({ theme }) => theme.colors.primary};
+  }
 `;
 
 const Dashboard: React.FC = () => {
-  const [currentProductionId, setCurrentProductionId] = useState<string>('');
-  const { data: productions, isLoading: loadingProductions } = useProductions();
-  const { data: dashboard, isLoading: loadingDashboard, error } = useProductionDashboard(currentProductionId);
-
-  useEffect(() => {
-    // Get the first production as default
-    if (productions && productions.length > 0 && !currentProductionId) {
-      setCurrentProductionId(productions[0].id);
-      localStorage.setItem('currentProductionId', productions[0].id);
-    }
-  }, [productions, currentProductionId]);
-
-  if (loadingProductions || loadingDashboard) {
-    return (
-      <Container>
-        <LoadingState>Loading production data...</LoadingState>
-      </Container>
-    );
-  }
-
-  if (error) {
-    return (
-      <Container>
-        <Header>
-          <Title>Production Dashboard</Title>
-        </Header>
-        <ErrorState>
-          Failed to load dashboard data. Please try again later.
-        </ErrorState>
-      </Container>
-    );
-  }
-
-  const stats = [
-    { 
-      name: 'Days Remaining', 
-      value: dashboard?.schedule?.days_remaining || '-',
-      icon: Calendar, 
-      color: '#3B82F6' 
-    },
-    { 
-      name: 'Crew Members', 
-      value: dashboard?.crew_total || '0',
-      icon: Users, 
-      color: '#10B981' 
-    },
-    { 
-      name: 'Budget Used', 
-      value: dashboard?.budget?.percentage_used ? `${dashboard.budget.percentage_used}%` : '-',
-      icon: DollarSign, 
-      color: '#F59E0B' 
-    },
-    { 
-      name: 'Scenes Shot', 
-      value: dashboard?.scenes_completed && dashboard?.total_scenes 
-        ? `${dashboard.scenes_completed}/${dashboard.total_scenes}`
-        : '-',
-      icon: Clock, 
-      color: '#8B5CF6' 
-    },
-  ];
+  const { user } = useAuth();
+  
+  // Mock data - později nahradíš skutečnými daty z API
+  const stats = {
+    daysRemaining: 45,
+    crewMembers: 24,
+    budgetUsed: 67,
+    scenesShot: 32
+  };
+  
+  const productionName = "Můj Film"; // TODO: získat z API
 
   return (
-    <Container>
-      <Header>
-        <Title>Production Dashboard</Title>
-        <Subtitle>
-          {productions && productions.length > 0 
-            ? `${productions[0].title} - Day ${dashboard?.current_day || 1}`
-            : 'Welcome back! Here\'s your production overview.'}
-        </Subtitle>
-      </Header>
+    <DashboardContainer>
+      <PageHeader>
+        <PageTitle>Production Dashboard</PageTitle>
+        <PageSubtitle>
+          {productionName ? `${productionName} - Den 1` : 'Vyberte produkci'}
+        </PageSubtitle>
+      </PageHeader>
 
       <StatsGrid>
-        {stats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <StatCard key={stat.name}>
-              <StatContent>
-                <StatLabel>{stat.name}</StatLabel>
-                <StatValue>{stat.value}</StatValue>
-              </StatContent>
-              <IconWrapper color={stat.color}>
-                <Icon size={24} color="white" />
-              </IconWrapper>
-            </StatCard>
-          );
-        })}
+        <StatCard>
+          <StatHeader>
+            <StatInfo>
+              <StatLabel>Zbývá dní</StatLabel>
+              <StatValue>{stats.daysRemaining}</StatValue>
+            </StatInfo>
+            <StatIcon $color="#3B82F6">
+              <Calendar />
+            </StatIcon>
+          </StatHeader>
+        </StatCard>
+
+        <StatCard>
+          <StatHeader>
+            <StatInfo>
+              <StatLabel>Členů štábu</StatLabel>
+              <StatValue>{stats.crewMembers}</StatValue>
+            </StatInfo>
+            <StatIcon $color="#10B981">
+              <Users />
+            </StatIcon>
+          </StatHeader>
+        </StatCard>
+
+        <StatCard>
+          <StatHeader>
+            <StatInfo>
+              <StatLabel>Využitý rozpočet</StatLabel>
+              <StatValue>{stats.budgetUsed}%</StatValue>
+            </StatInfo>
+            <StatIcon $color="#F59E0B">
+              <DollarSign />
+            </StatIcon>
+          </StatHeader>
+        </StatCard>
+
+        <StatCard>
+          <StatHeader>
+            <StatInfo>
+              <StatLabel>Natočených scén</StatLabel>
+              <StatValue>{stats.scenesShot}</StatValue>
+            </StatInfo>
+            <StatIcon $color="#8B5CF6">
+              <Film />
+            </StatIcon>
+          </StatHeader>
+        </StatCard>
       </StatsGrid>
 
-      {/* Add more dashboard components here */}
-    </Container>
+      <QuickActions>
+        <SectionTitle>Rychlé akce</SectionTitle>
+        <ActionGrid>
+          <ActionButton>Dnešní plán</ActionButton>
+          <ActionButton>Přidat člena štábu</ActionButton>
+          <ActionButton>Nahrát dokument</ActionButton>
+          <ActionButton>Zobrazit rozpočet</ActionButton>
+        </ActionGrid>
+      </QuickActions>
+    </DashboardContainer>
   );
 };
 

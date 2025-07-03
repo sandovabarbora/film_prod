@@ -1,68 +1,73 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { api } from '../services/api';
+import React, { createContext, useState, useEffect, ReactNode } from 'react';
+import authService from '../services/authService';
 
 interface User {
-  id: string;
+  id: number;
   email: string;
   username: string;
-  first_name?: string;
-  last_name?: string;
+  first_name: string;
+  last_name: string;
 }
 
 interface AuthContextType {
   user: User | null;
-  isLoading: boolean;
+  loading: boolean;
+  login: (user: User, token: string) => void;
+  logout: () => void;
   isAuthenticated: boolean;
-  checkAuth: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | null>(null);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const checkAuth = async () => {
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      const response = await api.get('/auth/profile/');
-      setUser(response.data);
-    } catch (error) {
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      setUser(null);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Kontrola přihlášení při načtení
+    const checkAuth = () => {
+      try {
+        const currentUser = authService.getCurrentUser();
+        const isAuth = authService.isAuthenticated();
+        
+        if (currentUser && isAuth) {
+          setUser(currentUser);
+        }
+      } catch (error) {
+        console.error('Auth check error:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     checkAuth();
   }, []);
 
+  const login = (userData: User, token: string) => {
+    setUser(userData);
+    // authService už ukládá tokeny, takže tady jen aktualizujeme state
+  };
+
+  const logout = () => {
+    authService.logout();
+    setUser(null);
+  };
+
+  const value = {
+    user,
+    loading,
+    login,
+    logout,
+    isAuthenticated: !!user && authService.isAuthenticated()
+  };
+
   return (
-    <AuthContext.Provider 
-      value={{ 
-        user, 
-        isLoading, 
-        isAuthenticated: !!user,
-        checkAuth 
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
-};
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
-  return context;
 };

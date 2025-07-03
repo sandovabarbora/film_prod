@@ -1,36 +1,43 @@
-import { useMutation } from '@tanstack/react-query';
+import { useContext, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, apiEndpoints } from '../services/api';
+import { useMutation } from '@tanstack/react-query';
+import { AuthContext } from '../contexts/AuthContext';
+import authService from '../services/authService';
+import api from '../services/api';
 
-interface LoginData {
-  email: string;
-  password: string;
-}
-
-export const useLogin = () => {
+export const useAuth = () => {
+  const context = useContext(AuthContext);
   const navigate = useNavigate();
   
-  return useMutation({
-    mutationFn: async (data: LoginData) => {
-      const response = await api.post(apiEndpoints.auth.login, data);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  
+  // Logout s navigací
+  const handleLogout = useCallback(() => {
+    context.logout();
+    navigate('/login');
+  }, [context, navigate]);
+  
+  // Mutation pro update profilu
+  const updateProfile = useMutation({
+    mutationFn: async (data: { first_name?: string; last_name?: string; email?: string }) => {
+      const response = await api.patch('/auth/profile/', data);
       return response.data;
     },
-    onSuccess: (data) => {
-      localStorage.setItem('accessToken', data.access);
-      localStorage.setItem('refreshToken', data.refresh);
-      localStorage.setItem('user', JSON.stringify(data.user));
-      navigate('/');
+    onSuccess: (updatedUser) => {
+      // Aktualizuj user data v localStorage a context
+      const currentUser = authService.getCurrentUser();
+      const newUser = { ...currentUser, ...updatedUser };
+      localStorage.setItem('user', JSON.stringify(newUser));
+      context.login(newUser, localStorage.getItem('access_token') || '');
     },
   });
-};
-
-export const useLogout = () => {
-  const navigate = useNavigate();
   
-  return () => {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('user');
-    navigate('/login');
+  return {
+    ...context,
+    logout: handleLogout,
+    updateProfile: updateProfile.mutate,
+    isUpdatingProfile: updateProfile.isPending,
   };
 };

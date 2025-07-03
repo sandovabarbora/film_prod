@@ -1,69 +1,79 @@
-import type { DefaultTheme } from 'styled-components';
-
-export const theme: DefaultTheme = {
+export const theme = {
   colors: {
-    primary: {
-      dark: '#0a0a0a',
-      light: '#ffffff',
+    primary: '#00C896',
+    primaryDark: '#00A77E',
+    danger: '#E74C3C',
+    success: '#27AE60',
+    warning: '#F39C12',
+    
+    text: {
+      primary: '#FFFFFF',
+      secondary: '#B0B0C0',
+      muted: '#7F8C8D',
     },
-    accent: {
-      main: '#e50914',
-      muted: '#b81d24',
-    },
+    
     gray: {
-      100: '#f5f5f5',
-      300: '#e0e0e0',
-      400: '#bdbdbd',  // Přidáno
-      500: '#9e9e9e',
-      700: '#616161',
-      800: '#424242',  // Přidáno
-      850: '#303030',  // Přidáno
-      900: '#212121',
+      50: '#F9FAFB',
+      100: '#F3F4F6',
+      200: '#E5E7EB',
+      300: '#D1D5DB',
+      400: '#9CA3AF',
+      500: '#6B7280',
+      600: '#4B5563',
+      700: '#374151',
+      800: '#1F2937',
+      850: '#1A202C',
+      900: '#111827',
     },
-    status: {
-      success: '#4caf50',
-      warning: '#ff9800',
-      error: '#f44336',
+    
+    accent: {
+      main: '#00C896',
+      muted: '#00A77E',
     },
   },
+  
   fonts: {
     display: "'Bebas Neue', sans-serif",
-    body: "'Inter', sans-serif",
+    body: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
   },
+  
   sizes: {
-    h1: '3.5rem',
+    h1: '3rem',
     h2: '2.5rem',
     h3: '2rem',
-    h4: '1.5rem',
-    h5: '1.25rem',
-    h6: '1rem',
-    body: '1rem',
-    small: '0.875rem',
+    h4: '1.75rem',
+    h5: '1.5rem',
+    h6: '1.25rem',
   },
+  
   spacing: {
-    xs: '0.5rem',
-    sm: '1rem',
-    md: '1.5rem',
-    lg: '2rem',
-    xl: '3rem',
-    xxl: '4rem',
-    xxxl: '6rem',
+    xs: '0.25rem',
+    sm: '0.5rem',
+    md: '1rem',
+    lg: '1.5rem',
+    xl: '2rem',
+    '2xl': '3rem',
+    '3xl': '4rem',
   },
-  breakpoints: {
-    mobile: '480px',
-    tablet: '768px',
-    desktop: '1024px',
-    wide: '1440px',
-  },
+  
   transitions: {
-    fast: '150ms ease-out',
-    normal: '300ms ease-out',
-    slow: '500ms ease-out',
+    fast: '0.2s ease-in-out',
+    normal: '0.3s ease-in-out',
+    slow: '0.5s ease-in-out',
   },
+  
+  breakpoints: {
+    sm: '640px',
+    md: '768px',
+    lg: '1024px',
+    xl: '1280px',
+    '2xl': '1536px',
+  },
+  
   shadows: {
-    small: '0 2px 4px rgba(0,0,0,0.1)',
-    medium: '0 4px 8px rgba(0,0,0,0.12)',
-    large: '0 8px 16px rgba(0,0,0,0.15)',
-    xl: '0 12px 24px rgba(0,0,0,0.18)',
+    sm: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+    md: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+    lg: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+    xl: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
   },
 };
