@@ -16,7 +16,7 @@ urlpatterns = [
     
     # Authentication
     path('api/auth/', include('rest_framework.urls')),
-    
+    path('api/v1/auth/', include('apps.auth.urls')),  # <-- PŘIDAT TOTO
     # Frontend SPA - Vue.js bude servírováno odsud
     path('', TemplateView.as_view(template_name='index.html'), name='home'),
     

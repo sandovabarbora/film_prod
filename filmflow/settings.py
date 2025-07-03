@@ -140,6 +140,18 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 CORS_ALLOW_CREDENTIALS = True
+# Additional CORS settings for development
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+    CORS_ALLOW_CREDENTIALS = True
+    
+# Update REST_FRAMEWORK for better error handling
+REST_FRAMEWORK['DEFAULT_RENDERER_CLASSES'] = [
+    'rest_framework.renderers.JSONRenderer',
+]
+
+# Ensure JWT settings are correct
+SIMPLE_JWT['AUTH_HEADER_TYPES'] = ('Bearer',)
 
 # Internationalization
 LANGUAGE_CODE = 'cs-cz'

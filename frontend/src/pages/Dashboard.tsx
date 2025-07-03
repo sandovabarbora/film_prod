@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { Calendar, Users, DollarSign, Clock, TrendingUp, AlertCircle } from 'lucide-react';
+import { useProductions, useProductionDashboard } from '../hooks/useProduction';
 
 const Container = styled.div`
   padding: ${({ theme }) => theme.spacing.xl};
@@ -73,100 +74,95 @@ const IconWrapper = styled.div<{ color: string }>`
   opacity: 0.9;
 `;
 
-const ContentGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-  gap: ${({ theme }) => theme.spacing.lg};
+const LoadingState = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+  color: ${({ theme }) => theme.colors.gray[400]};
 `;
 
-const ContentCard = styled.div`
-  background: ${({ theme }) => theme.colors.gray[900]};
-  border: 1px solid ${({ theme }) => theme.colors.gray[800]};
-  border-radius: 12px;
+const ErrorState = styled.div`
+  background: ${({ theme }) => theme.colors.status.error}20;
+  border: 1px solid ${({ theme }) => theme.colors.status.error};
+  border-radius: 8px;
   padding: ${({ theme }) => theme.spacing.lg};
-`;
-
-const CardTitle = styled.h2`
-  font-size: ${({ theme }) => theme.sizes.h5};
-  color: ${({ theme }) => theme.colors.primary.light};
-  margin-bottom: ${({ theme }) => theme.spacing.md};
-  font-weight: 600;
-`;
-
-const ActivityList = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${({ theme }) => theme.spacing.md};
-`;
-
-const ActivityItem = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding-bottom: ${({ theme }) => theme.spacing.md};
-  border-bottom: 1px solid ${({ theme }) => theme.colors.gray[800]};
-
-  &:last-child {
-    border-bottom: none;
-    padding-bottom: 0;
-  }
-`;
-
-const ActivityInfo = styled.div``;
-
-const ActivityTitle = styled.p`
-  font-weight: 500;
-  color: ${({ theme }) => theme.colors.primary.light};
-  margin-bottom: ${({ theme }) => theme.spacing.xs};
-`;
-
-const ActivityTime = styled.p`
-  font-size: ${({ theme }) => theme.sizes.small};
-  color: ${({ theme }) => theme.colors.gray[500]};
-`;
-
-const ActivityBadge = styled.span`
-  font-size: ${({ theme }) => theme.sizes.small};
-  font-weight: 500;
-  color: ${({ theme }) => theme.colors.accent.main};
-`;
-
-const AlertItem = styled.div`
-  display: flex;
-  gap: ${({ theme }) => theme.spacing.sm};
-  margin-bottom: ${({ theme }) => theme.spacing.md};
-
-  &:last-child {
-    margin-bottom: 0;
-  }
-`;
-
-const AlertContent = styled.div``;
-
-const AlertTitle = styled.p`
-  font-weight: 500;
-  color: ${({ theme }) => theme.colors.primary.light};
-  margin-bottom: ${({ theme }) => theme.spacing.xs};
-`;
-
-const AlertDescription = styled.p`
-  font-size: ${({ theme }) => theme.sizes.small};
-  color: ${({ theme }) => theme.colors.gray[500]};
+  color: ${({ theme }) => theme.colors.status.error};
+  margin: ${({ theme }) => theme.spacing.xl} 0;
 `;
 
 const Dashboard: React.FC = () => {
+  const [currentProductionId, setCurrentProductionId] = useState<string>('');
+  const { data: productions, isLoading: loadingProductions } = useProductions();
+  const { data: dashboard, isLoading: loadingDashboard, error } = useProductionDashboard(currentProductionId);
+
+  useEffect(() => {
+    // Get the first production as default
+    if (productions && productions.length > 0 && !currentProductionId) {
+      setCurrentProductionId(productions[0].id);
+      localStorage.setItem('currentProductionId', productions[0].id);
+    }
+  }, [productions, currentProductionId]);
+
+  if (loadingProductions || loadingDashboard) {
+    return (
+      <Container>
+        <LoadingState>Loading production data...</LoadingState>
+      </Container>
+    );
+  }
+
+  if (error) {
+    return (
+      <Container>
+        <Header>
+          <Title>Production Dashboard</Title>
+        </Header>
+        <ErrorState>
+          Failed to load dashboard data. Please try again later.
+        </ErrorState>
+      </Container>
+    );
+  }
+
   const stats = [
-    { name: 'Days Remaining', value: '45', icon: Calendar, color: '#3B82F6' },
-    { name: 'Crew Members', value: '127', icon: Users, color: '#10B981' },
-    { name: 'Budget Used', value: '67%', icon: DollarSign, color: '#F59E0B' },
-    { name: 'Scenes Shot', value: '89/145', icon: Clock, color: '#8B5CF6' },
+    { 
+      name: 'Days Remaining', 
+      value: dashboard?.schedule?.days_remaining || '-',
+      icon: Calendar, 
+      color: '#3B82F6' 
+    },
+    { 
+      name: 'Crew Members', 
+      value: dashboard?.crew_total || '0',
+      icon: Users, 
+      color: '#10B981' 
+    },
+    { 
+      name: 'Budget Used', 
+      value: dashboard?.budget?.percentage_used ? `${dashboard.budget.percentage_used}%` : '-',
+      icon: DollarSign, 
+      color: '#F59E0B' 
+    },
+    { 
+      name: 'Scenes Shot', 
+      value: dashboard?.scenes_completed && dashboard?.total_scenes 
+        ? `${dashboard.scenes_completed}/${dashboard.total_scenes}`
+        : '-',
+      icon: Clock, 
+      color: '#8B5CF6' 
+    },
   ];
 
   return (
     <Container>
       <Header>
         <Title>Production Dashboard</Title>
-        <Subtitle>Welcome back! Here's your production overview.</Subtitle>
+        <Subtitle>
+          {productions && productions.length > 0 
+            ? `${productions[0].title} - Day ${dashboard?.current_day || 1}`
+            : 'Welcome back! Here\'s your production overview.'}
+        </Subtitle>
       </Header>
 
       <StatsGrid>
@@ -186,40 +182,7 @@ const Dashboard: React.FC = () => {
         })}
       </StatsGrid>
 
-      <ContentGrid>
-        <ContentCard>
-          <CardTitle>Upcoming Schedule</CardTitle>
-          <ActivityList>
-            {[1, 2, 3].map((i) => (
-              <ActivityItem key={i}>
-                <ActivityInfo>
-                  <ActivityTitle>Scene {i * 12} - Exterior Downtown</ActivityTitle>
-                  <ActivityTime>Call time: 6:00 AM</ActivityTime>
-                </ActivityInfo>
-                <ActivityBadge>Tomorrow</ActivityBadge>
-              </ActivityItem>
-            ))}
-          </ActivityList>
-        </ContentCard>
-
-        <ContentCard>
-          <CardTitle>Production Alerts</CardTitle>
-          <AlertItem>
-            <AlertCircle size={20} color="#F59E0B" style={{ flexShrink: 0, marginTop: '2px' }} />
-            <AlertContent>
-              <AlertTitle>Weather Advisory</AlertTitle>
-              <AlertDescription>Rain expected for Thursday's shoot</AlertDescription>
-            </AlertContent>
-          </AlertItem>
-          <AlertItem>
-            <TrendingUp size={20} color="#10B981" style={{ flexShrink: 0, marginTop: '2px' }} />
-            <AlertContent>
-              <AlertTitle>Ahead of Schedule</AlertTitle>
-              <AlertDescription>2 days ahead on principal photography</AlertDescription>
-            </AlertContent>
-          </AlertItem>
-        </ContentCard>
-      </ContentGrid>
+      {/* Add more dashboard components here */}
     </Container>
   );
 };

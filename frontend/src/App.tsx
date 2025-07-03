@@ -1,6 +1,8 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import styled from 'styled-components';
+import { AuthProvider } from './contexts/AuthContext';
 import { Sidebar } from './components/layout/Sidebar';
 import Header from './components/Header';
 import Dashboard from './pages/Dashboard';
@@ -15,6 +17,15 @@ import Weather from './pages/Weather';
 import Login from './pages/Auth/Login';
 import { JoinProduction } from './pages/Auth/JoinProduction';
 import { Onboarding } from './pages/Auth/Onboarding';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const AppContainer = styled.div`
   display: flex;
@@ -35,9 +46,8 @@ const ContentArea = styled.main`
   background: ${({ theme }) => theme.colors.gray[850]};
 `;
 
-// Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const isAuth = localStorage.getItem('isAuthenticated') === 'true';
+  const isAuth = localStorage.getItem('accessToken');
   
   if (!isAuth) {
     return <Navigate to="/login" replace />;
@@ -46,7 +56,6 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   return <>{children}</>;
 };
 
-// Layout Component
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
     <AppContainer>
@@ -63,79 +72,81 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
 function App() {
   return (
-    <Router>
-      <Routes>
-        {/* Auth Routes */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/join" element={<JoinProduction />} />
-        <Route path="/onboarding" element={<Onboarding />} />
-        
-        {/* Protected Routes */}
-        <Route path="/" element={
-          <ProtectedRoute>
-            <Layout>
-              <Dashboard />
-            </Layout>
-          </ProtectedRoute>
-        } />
-        <Route path="/schedule" element={
-          <ProtectedRoute>
-            <Layout>
-              <Schedule />
-            </Layout>
-          </ProtectedRoute>
-        } />
-        <Route path="/crew" element={
-          <ProtectedRoute>
-            <Layout>
-              <Crew />
-            </Layout>
-          </ProtectedRoute>
-        } />
-        <Route path="/equipment" element={
-          <ProtectedRoute>
-            <Layout>
-              <Equipment />
-            </Layout>
-          </ProtectedRoute>
-        } />
-        <Route path="/locations" element={
-          <ProtectedRoute>
-            <Layout>
-              <Locations />
-            </Layout>
-          </ProtectedRoute>
-        } />
-        <Route path="/budget" element={
-          <ProtectedRoute>
-            <Layout>
-              <Budget />
-            </Layout>
-          </ProtectedRoute>
-        } />
-        <Route path="/documents" element={
-          <ProtectedRoute>
-            <Layout>
-              <Documents />
-            </Layout>
-          </ProtectedRoute>
-        } />
-        <Route path="/communication" element={
-          <ProtectedRoute>
-            <Layout>
-              <Communication />
-            </Layout>
-          </ProtectedRoute>
-        } />
-        <Route path="/weather" element={
-          <ProtectedRoute>
-            <Layout>
-              <Weather />
-            </Layout>
-          </ProtectedRoute>
-        } />
-      </Routes>
-    </Router>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <Router>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/join" element={<JoinProduction />} />
+            <Route path="/onboarding" element={<Onboarding />} />
+            
+            <Route path="/" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Dashboard />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/schedule" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Schedule />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/crew" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Crew />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/equipment" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Equipment />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/locations" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Locations />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/budget" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Budget />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/documents" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Documents />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/communication" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Communication />
+                </Layout>
+              </ProtectedRoute>
+            } />
+            <Route path="/weather" element={
+              <ProtectedRoute>
+                <Layout>
+                  <Weather />
+                </Layout>
+              </ProtectedRoute>
+            } />
+          </Routes>
+        </Router>
+      </AuthProvider>
+    </QueryClientProvider>
   );
 }
 
