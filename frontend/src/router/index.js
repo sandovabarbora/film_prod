@@ -18,6 +18,18 @@ const routes = [
     name: 'LiveDashboard',
     component: () => import('@/views/LiveDashboard.vue'),
     meta: { title: 'Live Dashboard - FilmFlow' }
+  },
+  {
+    path: '/analytics',
+    name: 'Analytics',
+    component: () => import('@/views/analytics/AnalyticsDashboard.vue'),
+    meta: { title: 'Analytics - FilmFlow' }
+  },
+  {
+    path: '/analytics/:productionId',
+    name: 'ProductionAnalytics',
+    component: () => import('@/views/analytics/AnalyticsDashboard.vue'),
+    meta: { title: 'Production Analytics - FilmFlow' }
   }
 ]
 

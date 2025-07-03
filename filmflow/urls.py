@@ -12,6 +12,7 @@ urlpatterns = [
     path('api/v1/crew/', include('apps.crew.urls')),
     path('api/v1/schedule/', include('apps.schedule.urls')),
     path('api/v1/notifications/', include('apps.notifications.urls')),
+    path('api/v1/analytics/', include('apps.analytics.urls')),
     
     # Authentication
     path('api/auth/', include('rest_framework.urls')),

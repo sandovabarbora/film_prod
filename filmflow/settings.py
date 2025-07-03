@@ -29,6 +29,8 @@ LOCAL_APPS = [
     'apps.crew',
     'apps.schedule',
     'apps.notifications',
+    'apps.analytics',
+    'apps.realtime',
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
