@@ -47,6 +47,7 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+*.bak
 
 # Testing
 .coverage
