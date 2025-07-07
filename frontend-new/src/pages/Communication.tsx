@@ -1,416 +1,880 @@
-import React, { useState } from 'react';
-import styled from 'styled-components';
-import { MessageSquare, Send, Hash, Lock, Users, Search, Paperclip, Smile, MoreVertical } from 'lucide-react';
+// src/pages/Communication.tsx
+import React, { useState, useEffect } from 'react'
+import styled from 'styled-components'
+import { useParams } from 'react-router-dom'
+import RealtimeDashboard from '../components/features/RealTimeHub/RealtimeDashboard'
+import RealtimeChat from '../components/features/RealTimeHub/RealtimeChat'
+import { useRealtime, useRealtimeChat, useRealtimeEvents } from '../hooks/useRealtime'
+import { useProduction } from '../hooks/useProduction'
+import { useAuth } from '../hooks/useAuth'
+import { realtimeApi } from '../services/realtimeApi'
 
-const CommunicationContainer = styled.div`
-  display: flex;
-  height: calc(100vh - 64px);
-  background: ${({ theme }) => theme.colors.gray[850]};
-`;
+interface ToastNotification {
+  id: number
+  type: 'success' | 'error' | 'warning' | 'info'
+  title: string
+  message: string
+}
 
-const ChannelSidebar = styled.div`
-  width: 280px;
-  background: ${({ theme }) => theme.colors.gray[800]};
-  border-right: 1px solid ${({ theme }) => theme.colors.gray[700]};
+const Communication: React.FC = () => {
+  const { productionId } = useParams<{ productionId: string }>()
+  const { user, token } = useAuth()
+  const { currentProduction, getProduction } = useProduction()
+  
+  const {
+    isConnected,
+    connectionStatus,
+    productionState,
+    connectToProduction,
+    sendStatusUpdate,
+    sendEmergencyAlert,
+    disconnect
+  } = useRealtime()
+
+  const {
+    isChatConnected,
+    chatStatus,
+    unreadCount,
+    connectToChat
+  } = useRealtimeChat()
+
+  const {
+    emergencyAlerts,
+    equipmentAlerts,
+    broadcastMessages
+  } = useRealtimeEvents()
+
+  // Local state
+  const [showDashboard, setShowDashboard] = useState(false)
+  const [showChat, setShowChat] = useState(false)
+  const [showQuickStatus, setShowQuickStatus] = useState(false)
+  const [chatRoomId, setChatRoomId] = useState<string | null>(null)
+  const [toasts, setToasts] = useState<ToastNotification[]>([])
+  const [chatRooms, setChatRooms] = useState<any[]>([])
+
+  // Quick status form
+  const [quickStatus, setQuickStatus] = useState({
+    status: 'prep',
+    scene: '',
+    notes: ''
+  })
+
+  // Computed values
+  const realtimeStatusText = {
+    connecting: 'Connecting...',
+    connected: 'Connected',
+    error: 'Error',
+    disconnected: 'Disconnected'
+  }[connectionStatus] || 'Disconnected'
+
+  const chatStatusText = {
+    connecting: 'Connecting...',
+    connected: 'Connected',
+    error: 'Error',
+    disconnected: 'Disconnected'
+  }[chatStatus] || 'Disconnected'
+
+  // Effects
+  useEffect(() => {
+    if (productionId && token) {
+      initializePage()
+    }
+
+    return () => {
+      disconnect()
+    }
+  }, [productionId, token])
+
+  // Setup realtime event handlers
+  useEffect(() => {
+    const handleEmergencyAlert = (data: any) => {
+      addToast('error', '🚨 EMERGENCY', data.description)
+      // Play urgent sound
+      playNotificationSound('emergency')
+    }
+    
+    const handleEquipmentAlert = (data: any) => {
+      addToast('warning', '⚠️ Equipment Alert', 
+        `${data.equipment_id}: ${data.description}`)
+    }
+    
+    const handleBroadcastMessage = (data: any) => {
+      addToast('info', '📢 Broadcast', data.message)
+    }
+
+    // These would need to be added to the WebSocket client
+    // WebSocketClient.on('emergency_alert', handleEmergencyAlert)
+    // WebSocketClient.on('equipment_alert', handleEquipmentAlert)
+    // WebSocketClient.on('broadcast_message', handleBroadcastMessage)
+
+    return () => {
+      // Cleanup listeners
+    }
+  }, [])
+
+  // Methods
+  const initializePage = async () => {
+    if (!productionId || !token) return
+
+    try {
+      // Load production data
+      const production = await getProduction(productionId)
+      
+      // Load chat rooms
+      const rooms = await realtimeApi.getChatRooms(productionId)
+      setChatRooms(rooms)
+      
+      // Set default chat room
+      const defaultRoom = rooms.find(room => room.room_type === 'general') || rooms[0]
+      if (defaultRoom) {
+        setChatRoomId(defaultRoom.id)
+      }
+      
+      // Connect to realtime services
+      await connectToProduction(productionId, token)
+      
+      // Auto-connect to chat if user preference
+      if (defaultRoom && localStorage.getItem('auto_connect_chat') !== 'false') {
+        await connectToChat(defaultRoom.id, token)
+      }
+    } catch (error) {
+      console.error('Failed to initialize communication page:', error)
+      addToast('error', 'Connection Error', 'Failed to connect to realtime services')
+    }
+  }
+
+  const toggleDashboard = () => {
+    setShowDashboard(!showDashboard)
+    if (showChat && !showDashboard) {
+      setShowChat(false) // Close chat if dashboard opens
+    }
+  }
+
+  const toggleChat = () => {
+    setShowChat(!showChat)
+    if (showDashboard && !showChat) {
+      setShowDashboard(false) // Close dashboard if chat opens
+    }
+    
+    // Connect to chat if not already connected
+    if (!showChat && !isChatConnected && chatRoomId && token) {
+      connectToChat(chatRoomId, token)
+    }
+  }
+
+  const quickStatusUpdate = () => {
+    setShowQuickStatus(true)
+  }
+
+  const handleQuickStatus = (e: React.FormEvent) => {
+    e.preventDefault()
+    const [scene, shot] = quickStatus.scene.split(' - ')
+    
+    sendStatusUpdate({
+      scene: scene || '',
+      shot: shot || '',
+      status: quickStatus.status,
+      notes: quickStatus.notes
+    })
+    
+    setShowQuickStatus(false)
+    setQuickStatus({ status: 'prep', scene: '', notes: '' })
+    
+    addToast('success', 'Status Updated', `Status changed to ${quickStatus.status}`)
+  }
+
+  const emergencyAlert = () => {
+    const message = prompt('Emergency Alert Message:')
+    if (message) {
+      sendEmergencyAlert({
+        type: 'general',
+        location: 'Set',
+        description: message,
+        actionRequired: 'Immediate attention required'
+      })
+      
+      addToast('warning', 'Emergency Alert Sent', message)
+    }
+  }
+
+  const addToast = (type: ToastNotification['type'], title: string, message: string) => {
+    const toast: ToastNotification = {
+      id: Date.now(),
+      type,
+      title,
+      message
+    }
+    
+    setToasts(prev => [...prev, toast])
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+      removeToast(toast.id)
+    }, 5000)
+  }
+
+  const removeToast = (id: number) => {
+    setToasts(prev => prev.filter(t => t.id !== id))
+  }
+
+  const playNotificationSound = (type: string) => {
+    try {
+      const audio = new Audio(`/sounds/${type}.mp3`)
+      audio.play().catch(() => {})
+    } catch (error) {
+      console.log('Could not play notification sound')
+    }
+  }
+
+  const switchChatRoom = (roomId: string) => {
+    setChatRoomId(roomId)
+    if (isChatConnected && token) {
+      connectToChat(roomId, token)
+    }
+  }
+
+  if (!productionId) {
+    return (
+      <Container>
+        <ErrorMessage>No production selected</ErrorMessage>
+      </Container>
+    )
+  }
+
+  return (
+    <Container>
+      {/* Header */}
+      <Header>
+        <h1>Communication Center</h1>
+        <HeaderActions>
+          <ChatRoomSelector>
+            <label>Chat Room:</label>
+            <select 
+              value={chatRoomId || ''} 
+              onChange={(e) => switchChatRoom(e.target.value)}
+            >
+              {chatRooms.map(room => (
+                <option key={room.id} value={room.id}>
+                  {room.name} {room.unread_count > 0 && `(${room.unread_count})`}
+                </option>
+              ))}
+            </select>
+          </ChatRoomSelector>
+          
+          <Button onClick={toggleChat} variant="outline">
+            💬 Chat {unreadCount > 0 && `(${unreadCount})`}
+          </Button>
+          <Button onClick={toggleDashboard} variant="outline">
+            📊 Dashboard
+          </Button>
+        </HeaderActions>
+      </Header>
+
+      {/* Main Content Area */}
+      <ContentGrid>
+        {/* Left Panel - Production Overview */}
+        <ContentPanel>
+          <ProductionOverview>
+            <h2>{currentProduction?.title || 'Loading...'}</h2>
+            <div className="production-stats">
+              <div className="stat">
+                <span className="stat-label">Status:</span>
+                <span className="stat-value">{productionState.title || 'Not Connected'}</span>
+              </div>
+              <div className="stat">
+                <span className="stat-label">Active Users:</span>
+                <span className="stat-value">{productionState.activeConnections}</span>
+              </div>
+            </div>
+          </ProductionOverview>
+
+          {/* Recent Activity */}
+          <RecentActivity>
+            <h3>Recent Activity</h3>
+            {emergencyAlerts.length > 0 && (
+              <div className="emergency-section">
+                <h4>🚨 Emergency Alerts</h4>
+                {emergencyAlerts.slice(0, 3).map((alert, index) => (
+                  <div key={index} className="alert-item emergency">
+                    <strong>{alert.emergency_type}</strong>
+                    <p>{alert.description}</p>
+                    <small>{alert.location}</small>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {equipmentAlerts.length > 0 && (
+              <div className="equipment-section">
+                <h4>⚠️ Equipment Alerts</h4>
+                {equipmentAlerts.slice(0, 3).map((alert, index) => (
+                  <div key={index} className="alert-item equipment">
+                    <strong>{alert.equipment_id}</strong> - {alert.alert_type}
+                    <p>{alert.description}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {broadcastMessages.length > 0 && (
+              <div className="broadcast-section">
+                <h4>📢 Broadcasts</h4>
+                {broadcastMessages.slice(0, 3).map((msg, index) => (
+                  <div key={index} className="alert-item broadcast">
+                    <p>{msg.message}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </RecentActivity>
+        </ContentPanel>
+
+        {/* Right Panel - Realtime Dashboard */}
+        {showDashboard && (
+          <SidebarPanel>
+            <PanelHeader>
+              <h3>Realtime Dashboard</h3>
+              <CloseBtn onClick={() => setShowDashboard(false)}>×</CloseBtn>
+            </PanelHeader>
+            <RealtimeDashboard productionId={productionId} />
+          </SidebarPanel>
+        )}
+
+        {/* Chat Panel (Overlay) */}
+        {showChat && chatRoomId && (
+          <ChatOverlay onClick={(e) => e.target === e.currentTarget && setShowChat(false)}>
+            <ChatPanel>
+              <PanelHeader>
+                <h3>Production Chat</h3>
+                <CloseBtn onClick={() => setShowChat(false)}>×</CloseBtn>
+              </PanelHeader>
+              <RealtimeChat roomId={chatRoomId} />
+            </ChatPanel>
+          </ChatOverlay>
+        )}
+      </ContentGrid>
+
+      {/* Status Bar */}
+      <StatusBar>
+        <ConnectionIndicators>
+          <Indicator className={connectionStatus}>
+            <IndicatorDot />
+            <span>Production: {realtimeStatusText}</span>
+          </Indicator>
+          <Indicator className={chatStatus}>
+            <IndicatorDot />
+            <span>Chat: {chatStatusText}</span>
+          </Indicator>
+        </ConnectionIndicators>
+        
+        <QuickActions>
+          <Button
+            onClick={quickStatusUpdate}
+            disabled={!isConnected}
+            variant="success"
+            size="sm"
+          >
+            📢 Quick Status
+          </Button>
+          <Button
+            onClick={emergencyAlert}
+            variant="danger"
+            size="sm"
+          >
+            🚨 Emergency
+          </Button>
+        </QuickActions>
+      </StatusBar>
+
+      {/* Toast Notifications */}
+      <ToastContainer>
+        {toasts.map((toast) => (
+          <Toast key={toast.id} type={toast.type}>
+            <ToastContent>
+              <strong>{toast.title}</strong>
+              <p>{toast.message}</p>
+            </ToastContent>
+            <ToastClose onClick={() => removeToast(toast.id)}>×</ToastClose>
+          </Toast>
+        ))}
+      </ToastContainer>
+
+      {/* Quick Status Modal */}
+      {showQuickStatus && (
+        <ModalOverlay onClick={(e) => e.target === e.currentTarget && setShowQuickStatus(false)}>
+          <Modal>
+            <ModalHeader>
+              <h3>Quick Status Update</h3>
+              <CloseBtn onClick={() => setShowQuickStatus(false)}>×</CloseBtn>
+            </ModalHeader>
+            <ModalBody>
+              <form onSubmit={handleQuickStatus}>
+                <FormGroup>
+                  <label>Current Status:</label>
+                  <select 
+                    value={quickStatus.status} 
+                    onChange={(e) => setQuickStatus(prev => ({...prev, status: e.target.value}))}
+                  >
+                    <option value="prep">Preparing</option>
+                    <option value="rehearsal">Rehearsing</option>
+                    <option value="lighting">Lighting</option>
+                    <option value="rolling">Rolling</option>
+                    <option value="reset">Resetting</option>
+                    <option value="moving_on">Moving On</option>
+                    <option value="meal_break">Meal Break</option>
+                    <option value="wrapped">Wrapped</option>
+                  </select>
+                </FormGroup>
+                <FormGroup>
+                  <label>Scene/Shot:</label>
+                  <input 
+                    value={quickStatus.scene}
+                    onChange={(e) => setQuickStatus(prev => ({...prev, scene: e.target.value}))}
+                    placeholder="e.g., INT. 1A - 001" 
+                  />
+                </FormGroup>
+                <FormGroup>
+                  <label>Notes:</label>
+                  <textarea 
+                    value={quickStatus.notes}
+                    onChange={(e) => setQuickStatus(prev => ({...prev, notes: e.target.value}))}
+                    placeholder="Optional notes..." 
+                  />
+                </FormGroup>
+                <ModalActions>
+                  <Button type="button" onClick={() => setShowQuickStatus(false)} variant="secondary">
+                    Cancel
+                  </Button>
+                  <Button type="submit" variant="primary">
+                    Send Update
+                  </Button>
+                </ModalActions>
+              </form>
+            </ModalBody>
+          </Modal>
+        </ModalOverlay>
+      )}
+    </Container>
+  )
+}
+
+// Styled Components
+const Container = styled.div`
+  height: 100vh;
   display: flex;
   flex-direction: column;
-`;
+  background: #f5f5f5;
+`
 
-const SidebarHeader = styled.div`
-  padding: 1.5rem;
-  border-bottom: 1px solid ${({ theme }) => theme.colors.gray[700]};
-`;
-
-const ProjectName = styled.h2`
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: ${({ theme }) => theme.colors.text.primary};
-  margin-bottom: 0.5rem;
-`;
-
-const SearchChannels = styled.div`
-  position: relative;
-  
-  svg {
-    position: absolute;
-    left: 0.75rem;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 16px;
-    height: 16px;
-    color: ${({ theme }) => theme.colors.text.secondary};
-  }
-`;
-
-const SearchInput = styled.input`
-  width: 100%;
-  padding: 0.5rem 0.75rem 0.5rem 2.5rem;
-  background: ${({ theme }) => theme.colors.gray[700]};
-  border: 1px solid ${({ theme }) => theme.colors.gray[600]};
-  border-radius: 6px;
-  color: ${({ theme }) => theme.colors.text.primary};
-  font-size: 0.875rem;
-  
-  &::placeholder {
-    color: ${({ theme }) => theme.colors.text.secondary};
-  }
-  
-  &:focus {
-    outline: none;
-    border-color: ${({ theme }) => theme.colors.primary};
-  }
-`;
-
-const ChannelList = styled.div`
-  flex: 1;
-  overflow-y: auto;
-  padding: 1rem;
-`;
-
-const ChannelSection = styled.div`
-  margin-bottom: 1.5rem;
-`;
-
-const SectionTitle = styled.h3`
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: ${({ theme }) => theme.colors.text.secondary};
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 0.5rem;
-  padding: 0 0.5rem;
-`;
-
-const Channel = styled.div<{ $active?: boolean }>`
+const Header = styled.div`
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: 6px;
-  color: ${props => props.$active ? props.theme.colors.text.primary : props.theme.colors.text.secondary};
-  background: ${props => props.$active ? props.theme.colors.gray[700] : 'transparent'};
-  cursor: pointer;
-  transition: all 0.2s;
-  margin-bottom: 0.25rem;
-  
-  &:hover {
-    background: ${({ theme }) => theme.colors.gray[700]};
-    color: ${({ theme }) => theme.colors.text.primary};
-  }
-  
-  svg {
-    width: 16px;
-    height: 16px;
-    opacity: 0.7;
-  }
-`;
-
-const ChannelName = styled.span`
-  font-size: 0.875rem;
-  font-weight: ${props => props.$unread ? '600' : '400'};
-`;
-
-const UnreadCount = styled.span`
-  margin-left: auto;
-  background: ${({ theme }) => theme.colors.primary};
-  color: white;
-  font-size: 0.75rem;
-  padding: 0.125rem 0.5rem;
-  border-radius: 10px;
-  font-weight: 600;
-`;
-
-const ChatArea = styled.div`
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-`;
-
-const ChatHeader = styled.div`
-  padding: 1rem 1.5rem;
-  border-bottom: 1px solid ${({ theme }) => theme.colors.gray[700]};
-  display: flex;
-  align-items: center;
   justify-content: space-between;
-`;
+  align-items: center;
+  padding: 20px;
+  background: white;
+  border-bottom: 1px solid #ddd;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 
-const ChatTitle = styled.div`
+  h1 {
+    margin: 0;
+  }
+`
+
+const HeaderActions = styled.div`
+  display: flex;
+  gap: 15px;
+  align-items: center;
+`
+
+const ChatRoomSelector = styled.div`
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  
-  h3 {
-    font-size: 1.125rem;
-    font-weight: 600;
-    color: ${({ theme }) => theme.colors.text.primary};
-  }
-  
-  svg {
-    width: 18px;
-    height: 18px;
-    color: ${({ theme }) => theme.colors.text.secondary};
-  }
-`;
+  gap: 10px;
 
-const ChatInfo = styled.p`
-  font-size: 0.875rem;
-  color: ${({ theme }) => theme.colors.text.secondary};
-`;
+  label {
+    font-weight: 500;
+  }
 
-const MessagesContainer = styled.div`
+  select {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+  }
+`
+
+const ContentGrid = styled.div`
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+`
+
+const ContentPanel = styled.div`
   flex: 1;
   overflow-y: auto;
-  padding: 1.5rem;
+  padding: 20px;
+`
+
+const ProductionOverview = styled.div`
+  background: white;
+  padding: 25px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+
+  h2 {
+    margin: 0 0 15px 0;
+  }
+
+  .production-stats {
+    display: flex;
+    gap: 30px;
+  }
+
+  .stat {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .stat-label {
+    font-size: 0.9em;
+    color: #666;
+  }
+
+  .stat-value {
+    font-size: 1.3em;
+    font-weight: bold;
+    color: #2196F3;
+  }
+`
+
+const RecentActivity = styled.div`
+  background: white;
+  padding: 25px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+
+  h3 {
+    margin: 0 0 20px 0;
+  }
+
+  h4 {
+    margin: 20px 0 10px 0;
+    font-size: 1.1em;
+  }
+
+  .alert-item {
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 6px;
+    border-left: 4px solid #ccc;
+
+    &.emergency {
+      background: #ffebee;
+      border-color: #f44336;
+    }
+
+    &.equipment {
+      background: #fff3e0;
+      border-color: #ff9800;
+    }
+
+    &.broadcast {
+      background: #e3f2fd;
+      border-color: #2196F3;
+    }
+
+    strong {
+      display: block;
+      margin-bottom: 5px;
+    }
+
+    p {
+      margin: 5px 0;
+      color: #666;
+    }
+
+    small {
+      color: #999;
+    }
+  }
+`
+
+const SidebarPanel = styled.div`
+  width: 400px;
+  background: white;
+  border-left: 1px solid #ddd;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-`;
+  overflow: hidden;
+`
 
-const MessageGroup = styled.div`
-  display: flex;
-  gap: 0.75rem;
-`;
-
-const Avatar = styled.div`
-  width: 36px;
-  height: 36px;
-  border-radius: 6px;
-  background: ${({ theme }) => theme.colors.primary};
+const ChatOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
-  font-weight: 600;
-  font-size: 0.875rem;
-  flex-shrink: 0;
-`;
+  z-index: 1000;
+`
 
-const MessageContent = styled.div`
-  flex: 1;
-`;
-
-const MessageHeader = styled.div`
-  display: flex;
-  align-items: baseline;
-  gap: 0.5rem;
-  margin-bottom: 0.25rem;
-`;
-
-const MessageAuthor = styled.span`
-  font-weight: 600;
-  color: ${({ theme }) => theme.colors.text.primary};
-`;
-
-const MessageTime = styled.span`
-  font-size: 0.75rem;
-  color: ${({ theme }) => theme.colors.text.secondary};
-`;
-
-const MessageText = styled.p`
-  font-size: 0.875rem;
-  color: ${({ theme }) => theme.colors.text.primary};
-  line-height: 1.5;
-`;
-
-const MessageInput = styled.div`
-  padding: 1rem 1.5rem;
-  border-top: 1px solid ${({ theme }) => theme.colors.gray[700]};
-`;
-
-const InputWrapper = styled.div`
-  display: flex;
-  gap: 0.75rem;
-  align-items: flex-end;
-`;
-
-const TextInput = styled.textarea`
-  flex: 1;
-  padding: 0.75rem 1rem;
-  background: ${({ theme }) => theme.colors.gray[800]};
-  border: 1px solid ${({ theme }) => theme.colors.gray[700]};
+const ChatPanel = styled.div`
+  width: 600px;
+  height: 700px;
+  background: white;
   border-radius: 8px;
-  color: ${({ theme }) => theme.colors.text.primary};
-  font-size: 0.875rem;
-  resize: none;
-  min-height: 44px;
-  max-height: 120px;
-  
-  &::placeholder {
-    color: ${({ theme }) => theme.colors.text.secondary};
-  }
-  
-  &:focus {
-    outline: none;
-    border-color: ${({ theme }) => theme.colors.primary};
-  }
-`;
-
-const InputActions = styled.div`
   display: flex;
-  gap: 0.5rem;
-`;
+  flex-direction: column;
+  overflow: hidden;
+`
 
-const IconButton = styled.button`
-  padding: 0.5rem;
-  background: transparent;
+const PanelHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  background: #f5f5f5;
+  border-bottom: 1px solid #ddd;
+
+  h3 {
+    margin: 0;
+  }
+`
+
+const CloseBtn = styled.button`
+  background: none;
   border: none;
-  color: ${({ theme }) => theme.colors.text.secondary};
+  font-size: 1.5em;
   cursor: pointer;
-  border-radius: 6px;
-  transition: all 0.2s;
-  
+  color: #666;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
   &:hover {
-    background: ${({ theme }) => theme.colors.gray[700]};
-    color: ${({ theme }) => theme.colors.text.primary};
+    background: #f0f0f0;
+    border-radius: 4px;
   }
-  
-  svg {
-    width: 20px;
-    height: 20px;
+`
+
+const StatusBar = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px;
+  background: white;
+  border-top: 1px solid #ddd;
+`
+
+const ConnectionIndicators = styled.div`
+  display: flex;
+  gap: 20px;
+`
+
+const Indicator = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9em;
+
+  &.connected {
+    color: #4CAF50;
   }
-`;
 
-const SendButton = styled(IconButton)`
-  background: ${({ theme }) => theme.colors.primary};
-  color: white;
-  
-  &:hover {
-    background: ${({ theme }) => theme.colors.primaryDark};
+  &.connecting {
+    color: #ff9800;
   }
-`;
 
-const Communication: React.FC = () => {
-  const [activeChannel, setActiveChannel] = useState('general');
-  
-  const channels = {
-    public: [
-      { id: 'general', name: 'general', icon: Hash, unread: 3 },
-      { id: 'production', name: 'production', icon: Hash },
-      { id: 'locations', name: 'locations', icon: Hash },
-      { id: 'dailies', name: 'dailies', icon: Hash, unread: 1 },
-    ],
-    private: [
-      { id: 'directors', name: 'directors', icon: Lock },
-      { id: 'producers', name: 'producers', icon: Lock },
-    ],
-    direct: [
-      { id: 'john-doe', name: 'John Doe', icon: Users, unread: 2 },
-      { id: 'jane-smith', name: 'Jane Smith', icon: Users },
-    ]
-  };
-  
-  const messages = [
-    { id: 1, author: 'John Doe', time: '10:30 AM', text: 'Good morning team! Ready for today\'s shoot?' },
-    { id: 2, author: 'Jane Smith', time: '10:32 AM', text: 'Morning! Yes, all set. Equipment is loaded and ready to go.' },
-    { id: 3, author: 'Mike Johnson', time: '10:35 AM', text: 'Weather looks good for the outdoor scenes. Clear skies until 6 PM.' },
-    { id: 4, author: 'Sarah Wilson', time: '10:40 AM', text: 'Just confirming - call time is 11 AM at the downtown location, right?' },
-    { id: 5, author: 'John Doe', time: '10:41 AM', text: 'That\'s correct! See everyone there.' },
-  ];
+  &.error, &.disconnected {
+    color: #f44336;
+  }
+`
 
-  return (
-    <CommunicationContainer>
-      <ChannelSidebar>
-        <SidebarHeader>
-          <ProjectName>Film Production</ProjectName>
-          <SearchChannels>
-            <Search />
-            <SearchInput placeholder="Search channels..." />
-          </SearchChannels>
-        </SidebarHeader>
-        
-        <ChannelList>
-          <ChannelSection>
-            <SectionTitle>Channels</SectionTitle>
-            {channels.public.map(channel => (
-              <Channel
-                key={channel.id}
-                $active={activeChannel === channel.id}
-                onClick={() => setActiveChannel(channel.id)}
-              >
-                <channel.icon />
-                <ChannelName $unread={!!channel.unread}>{channel.name}</ChannelName>
-                {channel.unread && <UnreadCount>{channel.unread}</UnreadCount>}
-              </Channel>
-            ))}
-          </ChannelSection>
-          
-          <ChannelSection>
-            <SectionTitle>Private Channels</SectionTitle>
-            {channels.private.map(channel => (
-              <Channel
-                key={channel.id}
-                $active={activeChannel === channel.id}
-                onClick={() => setActiveChannel(channel.id)}
-              >
-                <channel.icon />
-                <ChannelName>{channel.name}</ChannelName>
-              </Channel>
-            ))}
-          </ChannelSection>
-          
-          <ChannelSection>
-            <SectionTitle>Direct Messages</SectionTitle>
-            {channels.direct.map(channel => (
-              <Channel
-                key={channel.id}
-                $active={activeChannel === channel.id}
-                onClick={() => setActiveChannel(channel.id)}
-              >
-                <channel.icon />
-                <ChannelName $unread={!!channel.unread}>{channel.name}</ChannelName>
-                {channel.unread && <UnreadCount>{channel.unread}</UnreadCount>}
-              </Channel>
-            ))}
-          </ChannelSection>
-        </ChannelList>
-      </ChannelSidebar>
-      
-      <ChatArea>
-        <ChatHeader>
-          <ChatTitle>
-            <Hash />
-            <h3>{activeChannel}</h3>
-          </ChatTitle>
-          <ChatInfo>45 members</ChatInfo>
-        </ChatHeader>
-        
-        <MessagesContainer>
-          {messages.map(message => (
-            <MessageGroup key={message.id}>
-              <Avatar>{message.author.split(' ').map(n => n[0]).join('')}</Avatar>
-              <MessageContent>
-                <MessageHeader>
-                  <MessageAuthor>{message.author}</MessageAuthor>
-                  <MessageTime>{message.time}</MessageTime>
-                </MessageHeader>
-                <MessageText>{message.text}</MessageText>
-              </MessageContent>
-            </MessageGroup>
-          ))}
-        </MessagesContainer>
-        
-        <MessageInput>
-          <InputWrapper>
-            <TextInput 
-              placeholder={`Message #${activeChannel}`}
-              rows={1}
-            />
-            <InputActions>
-              <IconButton>
-                <Paperclip />
-              </IconButton>
-              <IconButton>
-                <Smile />
-              </IconButton>
-              <SendButton>
-                <Send />
-              </SendButton>
-            </InputActions>
-          </InputWrapper>
-        </MessageInput>
-      </ChatArea>
-    </CommunicationContainer>
-  );
-};
+const IndicatorDot = styled.span`
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+`
 
-export default Communication;
+const QuickActions = styled.div`
+  display: flex;
+  gap: 10px;
+`
+
+const Button = styled.button<{ variant?: string; size?: string }>`
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+
+  ${({ variant }) => {
+    switch (variant) {
+      case 'primary': return 'background: #2196F3; color: white;'
+      case 'secondary': return 'background: #6c757d; color: white;'
+      case 'success': return 'background: #4CAF50; color: white;'
+      case 'danger': return 'background: #f44336; color: white;'
+      case 'outline': return 'background: transparent; border: 1px solid #ddd; color: #333;'
+      default: return 'background: #e0e0e0; color: #333;'
+    }
+  }}
+
+  ${({ size }) => {
+    if (size === 'sm') return 'padding: 5px 10px; font-size: 12px;'
+    return ''
+  }}
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  &:hover:not(:disabled) {
+    opacity: 0.9;
+  }
+`
+
+const ToastContainer = styled.div`
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 2000;
+`
+
+const Toast = styled.div<{ type: string }>`
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  margin-bottom: 10px;
+  padding: 15px;
+  min-width: 300px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-left: 4px solid #ccc;
+
+  ${({ type }) => {
+    switch (type) {
+      case 'success': return 'border-color: #4CAF50;'
+      case 'error': return 'border-color: #f44336;'
+      case 'warning': return 'border-color: #ff9800;'
+      case 'info': return 'border-color: #2196F3;'
+      default: return ''
+    }
+  }}
+`
+
+const ToastContent = styled.div`
+  strong {
+    display: block;
+    margin-bottom: 5px;
+  }
+
+  p {
+    margin: 0;
+    color: #666;
+  }
+`
+
+const ToastClose = styled.button`
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.2em;
+  color: #666;
+  margin-left: 10px;
+  padding: 0;
+`
+
+const ModalOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+`
+
+const Modal = styled.div`
+  background: white;
+  border-radius: 8px;
+  width: 500px;
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow: hidden;
+`
+
+const ModalHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #ddd;
+
+  h3 {
+    margin: 0;
+  }
+`
+
+const ModalBody = styled.div`
+  padding: 20px;
+`
+
+const FormGroup = styled.div`
+  margin-bottom: 20px;
+
+  label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+  }
+
+  input, select, textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    box-sizing: border-box;
+
+    &:focus {
+      outline: none;
+      border-color: #2196F3;
+    }
+  }
+
+  textarea {
+    min-height: 80px;
+    resize: vertical;
+  }
+`
+
+const ModalActions = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+`
+
+const ErrorMessage = styled.div`
+  text-align: center;
+  color: #f44336;
+  font-size: 1.2em;
+  padding: 40px;
+`
+
+export default Communication
