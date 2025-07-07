@@ -27,6 +27,7 @@ THIRD_PARTY_APPS = [
 
 LOCAL_APPS = [
     'apps.production',
+    'apps.auth',  # <-- PŘIDAT TOTO
     'apps.crew',
     'apps.schedule',
     'apps.notifications',

@@ -1,125 +1,109 @@
-# apps/schedule/models.py
 from django.db import models
 from django.contrib.auth.models import User
-from django.core.exceptions import ValidationError
 from django.utils import timezone
-from apps.production.models import Production, Scene, Location
-from apps.crew.models import CrewMember, CallSheet
+from apps.production.models import Production, Scene
+from datetime import datetime, timedelta
 import uuid
-from datetime import timedelta, datetime
 
 class ShootingDay(models.Model):
-    """Represents a single shooting day"""
+    """Individual shooting days"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     production = models.ForeignKey(Production, on_delete=models.CASCADE, related_name='shooting_days')
-    day_number = models.IntegerField()
-    date = models.DateField()
     
-    # Status
-    status = models.CharField(max_length=20, choices=[
-        ('scheduled', 'Scheduled'),
-        ('prep', 'Prep Day'),
-        ('shooting', 'Shooting'),
-        ('wrap', 'Wrapped'),
-        ('cancelled', 'Cancelled'),
-        ('weather_hold', 'Weather Hold')
-    ], default='scheduled')
+    # Day info
+    shoot_date = models.DateField()
+    day_number = models.IntegerField()  # Day 1, Day 2, etc.
     
     # Times
-    crew_call = models.TimeField(help_text="General crew call time")
-    shooting_call = models.TimeField(help_text="Camera rolls")
-    estimated_wrap = models.TimeField()
+    general_call = models.TimeField()
+    shooting_call = models.TimeField()
+    estimated_wrap = models.TimeField(null=True, blank=True)
     actual_wrap = models.TimeField(null=True, blank=True)
     
-    # Locations
-    primary_location = models.ForeignKey(Location, on_delete=models.SET_NULL, null=True, related_name='primary_days')
+    # Location
+    primary_location = models.ForeignKey('production.Location', on_delete=models.SET_NULL, null=True)
     
-    # Day type
-    day_type = models.CharField(max_length=20, choices=[
-        ('principal', 'Principal Photography'),
-        ('second_unit', 'Second Unit'),
-        ('splinter', 'Splinter Unit'),
-        ('rehearsal', 'Rehearsal'),
-        ('travel', 'Travel'),
-        ('off', 'Day Off')
-    ], default='principal')
+    # Weather
+    weather_forecast = models.CharField(max_length=200, blank=True)
+    sunrise = models.TimeField(null=True, blank=True)
+    sunset = models.TimeField(null=True, blank=True)
     
     # Notes
     notes = models.TextField(blank=True)
-    weather_conditions = models.CharField(max_length=100, blank=True)
-    
-    # Tracking
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_days')
-    
-    class Meta:
-        ordering = ['date']
-        unique_together = ['production', 'date']
-    
-    def __str__(self):
-        return f"Day {self.day_number} - {self.date}"
-    
-    @property
-    def total_pages(self):
-        return sum(s.scene.estimated_pages for s in self.scheduled_scenes.all())
-    
-    @property
-    def scenes_count(self):
-        return self.scheduled_scenes.count()
-    
-    def clean(self):
-        if self.shooting_call < self.crew_call:
-            raise ValidationError("Shooting call cannot be before crew call")
-        if self.estimated_wrap < self.shooting_call:
-            raise ValidationError("Wrap time must be after shooting call")
-
-class SceneSchedule(models.Model):
-    """Links scenes to shooting days with scheduling details"""
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    shooting_day = models.ForeignKey(ShootingDay, on_delete=models.CASCADE, related_name='scheduled_scenes')
-    scene = models.ForeignKey(Scene, on_delete=models.CASCADE, related_name='schedule_entries')
-    
-    # Timing
-    estimated_start = models.TimeField()
-    estimated_duration = models.DurationField()
-    actual_start = models.TimeField(null=True, blank=True)
-    actual_duration = models.DurationField(null=True, blank=True)
-    
-    # Order
-    day_order = models.IntegerField(help_text="Order within the shooting day")
+    special_requirements = models.TextField(blank=True)
     
     # Status
-    status = models.CharField(max_length=20, choices=[
+    STATUS_CHOICES = [
         ('scheduled', 'Scheduled'),
         ('in_progress', 'In Progress'),
         ('completed', 'Completed'),
-        ('pushed', 'Pushed'),
-        ('cancelled', 'Cancelled')
-    ], default='scheduled')
-    
-    # Requirements
-    crew_requirements = models.JSONField(default=dict, blank=True)
-    equipment_requirements = models.JSONField(default=dict, blank=True)
-    special_requirements = models.TextField(blank=True)
-    
-    # Notes
-    notes = models.TextField(blank=True)
+        ('cancelled', 'Cancelled'),
+        ('postponed', 'Postponed'),
+    ]
+    status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='scheduled')
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
-        ordering = ['shooting_day__date', 'day_order']
+        ordering = ['shoot_date', 'day_number']
+        unique_together = ['production', 'day_number']
+    
+    def __str__(self):
+        return f"Day {self.day_number} - {self.shoot_date}"
+    
+    @property
+    def total_scenes(self):
+        return self.scene_schedules.count()
+    
+    @property
+    def total_pages(self):
+        return sum(ss.scene.estimated_pages or 0 for ss in self.scene_schedules.all())
+
+class SceneSchedule(models.Model):
+    """Scenes scheduled for specific shooting day"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    shooting_day = models.ForeignKey(ShootingDay, on_delete=models.CASCADE, related_name='scene_schedules')
+    scene = models.ForeignKey(Scene, on_delete=models.CASCADE, related_name='schedule_entries')
+    
+    # Scheduling
+    day_order = models.IntegerField()  # Order within the day
+    estimated_start = models.TimeField()
+    estimated_duration = models.DurationField()
+    
+    # Actual timing
+    actual_start = models.TimeField(null=True, blank=True)
+    actual_end = models.TimeField(null=True, blank=True)
+    
+    # Status
+    STATUS_CHOICES = [
+        ('scheduled', 'Scheduled'),
+        ('setup', 'Setting Up'),
+        ('rehearsal', 'Rehearsing'),
+        ('shooting', 'Shooting'),
+        ('completed', 'Completed'),
+        ('postponed', 'Postponed'),
+        ('cancelled', 'Cancelled'),
+    ]
+    status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='scheduled')
+    
+    # Notes
+    setup_notes = models.TextField(blank=True)
+    completion_notes = models.TextField(blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['shooting_day', 'day_order']
         unique_together = ['shooting_day', 'scene']
     
     def __str__(self):
-        return f"{self.scene.scene_number} on {self.shooting_day}"
+        return f"Scene {self.scene.scene_number} - Day {self.shooting_day.day_number}"
     
     @property
     def estimated_end(self):
         if self.estimated_start and self.estimated_duration:
-            # Convert time to datetime for calculation
             dt = datetime.combine(datetime.today(), self.estimated_start)
             return (dt + self.estimated_duration).time()
         return None
@@ -148,7 +132,7 @@ class DayBreak(models.Model):
 class StatusUpdate(models.Model):
     """Real-time status updates during shooting"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    production = models.ForeignKey(Production, on_delete=models.CASCADE, related_name='status_updates')
+    production = models.ForeignKey(Production, on_delete=models.CASCADE, related_name='schedule_status_updates')
     shooting_day = models.ForeignKey(ShootingDay, on_delete=models.CASCADE, related_name='status_updates')
     
     # What's happening
@@ -244,60 +228,30 @@ class ScheduleChange(models.Model):
     
     # What changed
     change_type = models.CharField(max_length=30, choices=[
+        ('scene_moved', 'Scene Moved'),
         ('scene_added', 'Scene Added'),
         ('scene_removed', 'Scene Removed'),
-        ('scene_moved', 'Scene Moved'),
-        ('day_added', 'Day Added'),
-        ('day_cancelled', 'Day Cancelled'),
         ('time_changed', 'Time Changed'),
-        ('location_changed', 'Location Changed')
+        ('location_changed', 'Location Changed'),
+        ('day_cancelled', 'Day Cancelled'),
+        ('day_added', 'Day Added'),
     ])
     
-    # Details
-    shooting_day = models.ForeignKey(ShootingDay, on_delete=models.SET_NULL, null=True, blank=True)
-    scene = models.ForeignKey(Scene, on_delete=models.SET_NULL, null=True, blank=True)
-    old_value = models.JSONField(null=True, blank=True)
-    new_value = models.JSONField(null=True, blank=True)
+    # Target objects
+    shooting_day = models.ForeignKey(ShootingDay, on_delete=models.CASCADE, null=True, blank=True)
+    scene = models.ForeignKey(Scene, on_delete=models.CASCADE, null=True, blank=True)
+    
+    # Change details
+    old_value = models.TextField(blank=True)
+    new_value = models.TextField(blank=True)
     reason = models.TextField()
     
-    # Who and when
+    # Metadata
     changed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
     changed_at = models.DateTimeField(auto_now_add=True)
-    
-    # Notifications
-    notify_crew = models.BooleanField(default=True)
-    notified_at = models.DateTimeField(null=True, blank=True)
     
     class Meta:
         ordering = ['-changed_at']
     
     def __str__(self):
         return f"{self.get_change_type_display()} - {self.changed_at}"
-
-class ScheduleTemplate(models.Model):
-    """Reusable schedule templates"""
-    name = models.CharField(max_length=100)
-    description = models.TextField(blank=True)
-    
-    # Template data
-    day_length_hours = models.IntegerField(default=12)
-    meal_break_after_hours = models.IntegerField(default=6)
-    meal_break_duration_minutes = models.IntegerField(default=30)
-    
-    # Default times
-    default_crew_call = models.TimeField(default='07:00')
-    default_shooting_call = models.TimeField(default='08:00')
-    
-    # Scene ordering preferences
-    prioritize_locations = models.BooleanField(default=True, help_text="Group scenes by location")
-    prioritize_cast = models.BooleanField(default=False, help_text="Group scenes by cast")
-    prioritize_time_of_day = models.BooleanField(default=True, help_text="Shoot day scenes during day")
-    
-    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    
-    class Meta:
-        ordering = ['name']
-    
-    def __str__(self):
-        return self.name

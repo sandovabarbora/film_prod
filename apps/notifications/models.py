@@ -67,7 +67,7 @@ class Notification(models.Model):
     message = models.TextField()
     
     # Metadata
-    shooting_day = models.ForeignKey(ShootingDay, on_delete=models.SET_NULL, null=True, blank=True)
+    shooting_day = models.ForeignKey(ShootingDay, on_delete=models.SET_NULL, null=True, blank=True, related_name='notifications')
     related_scene = models.CharField(max_length=10, blank=True)  # Scene number
     
     # Delivery tracking
@@ -111,10 +111,10 @@ class NotificationRecipient(models.Model):
         status = "Read" if self.read_at else "Delivered" if self.delivered_at else "Pending"
         return f"{self.crew_member.full_name} - {status}"
 
-class StatusUpdate(models.Model):
-    """Real-time status updates pro dashboard"""
-    production = models.ForeignKey(Production, on_delete=models.CASCADE, related_name='status_updates')
-    shooting_day = models.ForeignKey(ShootingDay, on_delete=models.CASCADE, related_name='status_updates')
+class LiveStatusUpdate(models.Model):
+    """Real-time status updates pro dashboard (přejmenováno z StatusUpdate)"""
+    production = models.ForeignKey(Production, on_delete=models.CASCADE, related_name='live_status_updates')
+    shooting_day = models.ForeignKey(ShootingDay, on_delete=models.CASCADE, related_name='live_status_updates')
     
     updated_by = models.ForeignKey(CrewMember, on_delete=models.CASCADE)
     

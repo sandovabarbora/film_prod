@@ -1,10 +1,17 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views.dashboard_views import AnalyticsDashboardViewSet, MetricsCalculationViewSet
+from .views import (
+    ProductionMetricsViewSet, CrewPerformanceViewSet, BudgetTrackingViewSet,
+    ProgressReportViewSet, VelocityTrendViewSet, AnalyticsDashboardViewSet
+)
 
 router = DefaultRouter()
-router.register(r'dashboard', AnalyticsDashboardViewSet, basename='analytics-dashboard')
-router.register(r'metrics', MetricsCalculationViewSet, basename='analytics-metrics')
+router.register(r'metrics', ProductionMetricsViewSet)
+router.register(r'crew-performance', CrewPerformanceViewSet)
+router.register(r'budget', BudgetTrackingViewSet)
+router.register(r'reports', ProgressReportViewSet)
+router.register(r'velocity', VelocityTrendViewSet)
+router.register(r'dashboard', AnalyticsDashboardViewSet, basename='dashboard')
 
 urlpatterns = [
     path('', include(router.urls)),
