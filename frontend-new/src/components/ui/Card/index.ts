@@ -1,1 +1,6 @@
-export { FilmCard } from './FilmCard';
+export { 
+  Card, 
+  CardHeader, 
+  CardContent, 
+  CardFooter 
+} from './Card';
