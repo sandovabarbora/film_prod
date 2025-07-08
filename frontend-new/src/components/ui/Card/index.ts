@@ -2,5 +2,8 @@ export {
   Card, 
   CardHeader, 
   CardContent, 
-  CardFooter 
+  CardFooter,
+  GlassCard,
+  ElevatedCard,
+  GradientCard
 } from './Card';

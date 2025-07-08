@@ -1,1 +1,5 @@
-export { Sidebar } from './Sidebar';
+export { 
+  Sidebar, 
+  useSidebar, 
+  SidebarToggle 
+} from './Sidebar';

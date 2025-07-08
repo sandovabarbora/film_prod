@@ -39,9 +39,9 @@ export function Card({
       className={cardClass}
       {...props}
     >
-      <CardContent>
+      <InnerCardContent>
         {children}
-      </CardContent>
+      </InnerCardContent>
       {variant === 'neon' && <NeonBorder />}
     </StyledCard>
   );
@@ -106,7 +106,7 @@ export function GradientCard(props: Omit<CardProps, 'variant'>) {
   return <Card variant="gradient" glow {...props} />;
 }
 
-// Styled components
+// Styled components helpers
 const getVariantStyles = (variant: CardVariant) => {
   const variants = {
     default: css`
@@ -116,10 +116,10 @@ const getVariantStyles = (variant: CardVariant) => {
     `,
     
     glass: css`
-      background: ${props => props.theme.glass.light.background};
-      backdrop-filter: ${props => props.theme.glass.light.backdrop};
-      border: 1px solid ${props => props.theme.glass.light.border};
-      box-shadow: ${props => props.theme.shadows.glassSm};
+      background: ${props => props.theme.glass?.light?.background || 'rgba(255, 255, 255, 0.1)'};
+      backdrop-filter: blur(10px);
+      border: 1px solid ${props => props.theme.glass?.light?.border || 'rgba(255, 255, 255, 0.2)'};
+      box-shadow: ${props => props.theme.shadows.lg};
     `,
     
     elevated: css`
@@ -129,10 +129,10 @@ const getVariantStyles = (variant: CardVariant) => {
     `,
     
     gradient: css`
-      background: ${props => props.theme.colors.gradients.card};
-      backdrop-filter: ${props => props.theme.glass.medium.backdrop};
-      border: 1px solid ${props => props.theme.glass.medium.border};
-      box-shadow: ${props => props.theme.shadows.glass};
+      background: linear-gradient(135deg, ${props => props.theme.colors.surface}, ${props => props.theme.colors.background});
+      backdrop-filter: blur(10px);
+      border: 1px solid ${props => props.theme.colors.border};
+      box-shadow: ${props => props.theme.shadows.lg};
       position: relative;
       overflow: hidden;
 
@@ -143,7 +143,7 @@ const getVariantStyles = (variant: CardVariant) => {
         left: 0;
         right: 0;
         height: 2px;
-        background: ${props => props.theme.colors.gradients.sunset};
+        background: linear-gradient(90deg, ${props => props.theme.colors.primary}, ${props => props.theme.colors.secondary});
       }
     `,
 
@@ -173,6 +173,7 @@ const getPaddingStyles = (padding: CardPadding) => {
   return paddings[padding];
 };
 
+// Main styled components
 const StyledCard = styled.div<{
   variant: CardVariant;
   padding: CardPadding;
@@ -185,6 +186,7 @@ const StyledCard = styled.div<{
   position: relative;
   
   ${props => getVariantStyles(props.variant)}
+  ${props => getPaddingStyles(props.padding)}
   
   ${props => props.hover && css`
     &:hover {
@@ -225,8 +227,7 @@ const StyledCard = styled.div<{
   }
 `;
 
-const CardContent = styled.div<{}>`
-  ${props => getPaddingStyles('lg')}
+const InnerCardContent = styled.div`
   position: relative;
   z-index: 2;
 `;
@@ -241,10 +242,10 @@ const StyledCardHeader = styled.div<{ gradient: boolean }>`
   position: relative;
 
   ${props => props.gradient && css`
-    background: ${props => props.theme.colors.gradients.glass};
+    background: linear-gradient(135deg, ${props => props.theme.colors.surface}, ${props => props.theme.colors.background});
     margin: -${props => props.theme.spacing.xl} -${props => props.theme.spacing.xl} ${props => props.theme.spacing.lg};
     padding: ${props => props.theme.spacing.xl};
-    border-bottom: 1px solid ${props => props.theme.colors.borderAccent};
+    border-bottom: 1px solid ${props => props.theme.colors.border};
   `}
 `;
 
@@ -289,10 +290,10 @@ const StyledCardFooter = styled.div<{ gradient: boolean }>`
   }
 
   ${props => props.gradient && css`
-    background: ${props => props.theme.colors.gradients.glass};
+    background: linear-gradient(135deg, ${props => props.theme.colors.surface}, ${props => props.theme.colors.background});
     margin: ${props => props.theme.spacing.lg} -${props => props.theme.spacing.xl} -${props => props.theme.spacing.xl};
     padding: ${props => props.theme.spacing.xl};
-    border-top: 1px solid ${props => props.theme.colors.borderAccent};
+    border-top: 1px solid ${props => props.theme.colors.border};
   `}
 `;
 
@@ -314,7 +315,7 @@ const NeonBorder = styled.div`
     right: -2px;
     bottom: -2px;
     border-radius: ${props => props.theme.borderRadius['2xl']};
-    background: ${props => props.theme.colors.gradients.sunset};
+    background: linear-gradient(135deg, ${props => props.theme.colors.primary}, ${props => props.theme.colors.secondary});
     opacity: 0.3;
     filter: blur(4px);
     z-index: -1;
