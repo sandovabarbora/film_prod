@@ -25,6 +25,8 @@ import Equipment from './pages/Equipment';
 import Locations from './pages/Locations';
 import Documents from './pages/Documents';
 import Weather from './pages/Weather';
+import ProjectDetail from './pages/ProjectDetail';
+
 
 // Styles
 import { GlobalStyles } from './styles/GlobalStyles';
@@ -57,6 +59,7 @@ function App(): JSX.Element {
                         <Route path="/equipment" element={<Equipment />} />
                         <Route path="/locations" element={<Locations />} />
                         <Route path="/documents" element={<Documents />} />
+                        <Route path="/films/:id" element={<ProjectDetail />} />
                         <Route path="/weather" element={<Weather />} />
                       </Routes>
                     </AppLayout>

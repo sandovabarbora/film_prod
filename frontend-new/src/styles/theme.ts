@@ -28,11 +28,39 @@ export const Theme = {
     warningLight: '#fbbf24',
     error: '#ef4444', 
     errorLight: '#f87171',
+    danger: '#ef4444',        // Alias pro error (kvůli styled.d.ts)
     info: '#3b82f6',
     infoLight: '#60a5fa',
     
-    // Neutral system - warm
-    text: '#0f172a',           // Rich black
+    // Text system (kvůli styled.d.ts kompatibilitě)
+    text: {
+      primary: '#0f172a',      // Rich black
+      secondary: '#475569',    // Warm grey
+      muted: '#94a3b8',       // Light grey
+    },
+    
+    // Gray scale system (potřebné pro kompatibilitu)
+    gray: {
+      50: '#f8fafc',
+      100: '#f1f5f9',
+      200: '#e2e8f0',
+      300: '#cbd5e1',
+      400: '#94a3b8',
+      500: '#64748b',
+      600: '#475569',
+      700: '#334155',
+      800: '#1e293b',
+      850: '#0f172a',
+      900: '#020617',
+    },
+    
+    // Accent system (kvůli styled.d.ts)
+    accent: {
+      main: '#8b5cf6',
+      muted: 'rgba(139, 92, 246, 0.1)',
+    },
+    
+    // Legacy color names pro backward compatibility
     textSecondary: '#475569',  // Warm grey
     textMuted: '#94a3b8',
     textInverse: '#ffffff',
@@ -67,6 +95,22 @@ export const Theme = {
       card: 'linear-gradient(145deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.4) 100%)',
       text: 'linear-gradient(135deg, #f97316 0%, #8b5cf6 100%)',
     }
+  },
+  
+  // Fonts pro styled.d.ts kompatibilitu
+  fonts: {
+    display: '"Space Grotesk", "Inter", sans-serif',
+    body: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif',
+  },
+  
+  // Sizes pro styled.d.ts kompatibilitu
+  sizes: {
+    h1: '2.5rem',
+    h2: '2rem',
+    h3: '1.75rem',
+    h4: '1.5rem',
+    h5: '1.25rem',
+    h6: '1.125rem',
   },
   
   spacing: {
@@ -138,7 +182,7 @@ export const Theme = {
   },
   
   shadows: {
-    // Subtle shadows
+    // Basic shadows pro styled.d.ts kompatibilitu
     sm: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
     md: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
     lg: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
@@ -162,6 +206,27 @@ export const Theme = {
     glowSuccess: '0 0 20px rgba(16, 185, 129, 0.4)',
   },
   
+  transitions: {
+    fast: '0.15s cubic-bezier(0.4, 0, 0.2, 1)',
+    normal: '0.25s cubic-bezier(0.4, 0, 0.2, 1)', 
+    slow: '0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+    slowest: '0.75s cubic-bezier(0.4, 0, 0.2, 1)',
+    
+    // Cinematic easing
+    bounce: '0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+    spring: '0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+    dramatic: '0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+  },
+  
+  breakpoints: {
+    sm: '640px',
+    md: '768px',
+    lg: '1024px', 
+    xl: '1280px',
+    '2xl': '1536px',
+    '3xl': '1920px',
+  },
+  
   borderRadius: {
     none: '0',
     sm: '0.125rem',    // 2px
@@ -172,16 +237,6 @@ export const Theme = {
     '3xl': '1.5rem',   // 24px
     '4xl': '2rem',     // 32px
     full: '9999px',
-  },
-  
-  breakpoints: {
-    xs: '475px',
-    sm: '640px',
-    md: '768px',
-    lg: '1024px', 
-    xl: '1280px',
-    '2xl': '1536px',
-    '3xl': '1920px',
   },
   
   zIndex: {
@@ -199,19 +254,6 @@ export const Theme = {
     toast: 1700,
     tooltip: 1800,
     cursor: 9999,
-  },
-  
-  transitions: {
-    none: 'none',
-    fast: '0.15s cubic-bezier(0.4, 0, 0.2, 1)',
-    normal: '0.25s cubic-bezier(0.4, 0, 0.2, 1)', 
-    slow: '0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-    slowest: '0.75s cubic-bezier(0.4, 0, 0.2, 1)',
-    
-    // Cinematic easing
-    bounce: '0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
-    spring: '0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-    dramatic: '0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
   },
   
   // Glass morphism system
