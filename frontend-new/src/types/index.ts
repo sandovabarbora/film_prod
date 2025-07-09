@@ -22,7 +22,7 @@ export interface ApiResponse<T> {
   results: T[];
 }
 
-// Auth types - MUSÍ být zde!
+// Auth types
 export interface LoginCredentials {
   username: string;
   password: string;
@@ -107,15 +107,39 @@ export interface CrewMember {
   created_at: string;
 }
 
+// Updated CrewAssignment typ pro ProjectDetail kompatibilitu
 export interface CrewAssignment {
-  id: string;
-  production: string;
-  crew_member: CrewMember;
-  position: Position;
+  id: number;
+  crew_member: {
+    id: number;
+    first_name: string;
+    last_name: string;
+    email: string;
+    primary_position: {
+      title: string;
+      department: { 
+        name: string;
+      };
+    };
+  };
+  role: string;
   start_date: string;
-  end_date?: string;
+  end_date: string;
   daily_rate: number;
-  status: 'confirmed' | 'pending' | 'tentative' | 'cancelled' | 'completed';
+  is_key_personnel: boolean;
+}
+
+// Project typ pro ProjectDetail kompatibilitu
+export interface Project {
+  id: number;
+  title: string;
+  description: string;
+  status: 'development' | 'pre_production' | 'production' | 'post_production' | 'completed' | 'cancelled';
+  start_date: string;
+  end_date: string;
+  budget_total: number;
+  location_primary: string;
+  created_at: string;
 }
 
 // Schedule types

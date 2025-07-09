@@ -1,17 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import styled from 'styled-components';
 import { useParams, useNavigate } from 'react-router-dom';
-import CrewAssignmentModal from '../components/features/CrewAssignmentModal/CrewAssignmentModal';
+import styled from 'styled-components';
 import { 
-  ArrowLeft, Film, Users, Calendar, DollarSign, MapPin, 
-  Settings, Plus, Edit, Trash2, Clock, Target, Activity
+  ArrowLeft, 
+  Edit, 
+  Settings, 
+  Trash2, 
+  Film, 
+  Target, 
+  Users, 
+  Calendar, 
+  DollarSign, 
+  Activity,
+  Plus,
+  Mail,
+  Phone,
+  MapPin,
+  Clock
 } from 'lucide-react';
+import { CrewAssignmentModal } from '../components/features/CrewManagement';
 
+// Lokální typy pro ProjectDetail
 interface Project {
   id: number;
   title: string;
   description: string;
-  status: string;
+  status: 'development' | 'pre_production' | 'production' | 'post_production' | 'completed' | 'cancelled';
   start_date: string;
   end_date: string;
   budget_total: number;
@@ -28,7 +42,7 @@ interface CrewAssignment {
     email: string;
     primary_position: {
       title: string;
-      department: {
+      department: { 
         name: string;
       };
     };
@@ -49,10 +63,10 @@ const DetailContainer = styled.div`
 const Header = styled.div`
   display: flex;
   align-items: center;
-  gap: 1rem;
+  justify-content: space-between;
   margin-bottom: 2rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid ${({ theme }) => theme.colors.border};
+  gap: 1rem;
+  flex-wrap: wrap;
 `;
 
 const BackButton = styled.button`
@@ -60,218 +74,229 @@ const BackButton = styled.button`
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 1rem;
-  background: transparent;
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
   color: ${({ theme }) => theme.colors.text.secondary};
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
   
   &:hover {
-    background: ${({ theme }) => theme.colors.border};
+    background: rgba(255, 255, 255, 0.08);
     color: ${({ theme }) => theme.colors.text.primary};
   }
 `;
 
 const ProjectInfo = styled.div`
   flex: 1;
+  min-width: 0;
 `;
 
 const ProjectTitle = styled.h1`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 0;
   font-size: 2rem;
   font-weight: 700;
   color: ${({ theme }) => theme.colors.text.primary};
-  margin: 0 0 0.5rem 0;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  
-  svg {
-    color: ${({ theme }) => theme.colors.primary};
-  }
+  flex-wrap: wrap;
 `;
 
 const StatusBadge = styled.span<{ $status: string }>`
-  padding: 0.25rem 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  padding: 0.375rem 0.75rem;
   border-radius: 20px;
   font-size: 0.75rem;
-  font-weight: 500;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   background: ${({ $status, theme }) => {
     switch ($status) {
-      case 'development': return theme.colors.info + '20';
-      case 'pre_production': return theme.colors.warning + '20';
-      case 'production': return theme.colors.primary + '20';
-      case 'post_production': return theme.colors.accent.main + '20';
+      case 'development': return theme.colors.warning + '20';
+      case 'pre_production': return theme.colors.info + '20';
+      case 'production': return theme.colors.success + '20';
+      case 'post_production': return theme.colors.primary + '20';
       case 'completed': return theme.colors.success + '20';
-      case 'cancelled': return theme.colors.gray[500] + '20';
-      default: return theme.colors.gray[500] + '20';
+      case 'cancelled': return theme.colors.error + '20';
+      default: return theme.colors.neutral + '20';
     }
   }};
   color: ${({ $status, theme }) => {
     switch ($status) {
-      case 'development': return theme.colors.info;
-      case 'pre_production': return theme.colors.warning;
-      case 'production': return theme.colors.primary;
-      case 'post_production': return theme.colors.accent.main;
+      case 'development': return theme.colors.warning;
+      case 'pre_production': return theme.colors.info;
+      case 'production': return theme.colors.success;
+      case 'post_production': return theme.colors.primary;
       case 'completed': return theme.colors.success;
-      case 'cancelled': return theme.colors.gray[500];
-      default: return theme.colors.gray[500];
+      case 'cancelled': return theme.colors.error;
+      default: return theme.colors.neutral;
+    }
+  }};
+  border: 1px solid ${({ $status, theme }) => {
+    switch ($status) {
+      case 'development': return theme.colors.warning + '40';
+      case 'pre_production': return theme.colors.info + '40';
+      case 'production': return theme.colors.success + '40';
+      case 'post_production': return theme.colors.primary + '40';
+      case 'completed': return theme.colors.success + '40';
+      case 'cancelled': return theme.colors.error + '40';
+      default: return theme.colors.neutral + '40';
     }
   }};
 `;
 
 const ActionButtons = styled.div`
   display: flex;
-  gap: 0.75rem;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 `;
 
-const ActionButton = styled.button<{ $variant?: 'primary' | 'danger' }>`
+const ActionButton = styled.button<{ $variant?: 'danger' }>`
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  background: ${({ $variant, theme }) => {
-    switch ($variant) {
-      case 'primary': return theme.colors.primary;
-      case 'danger': return theme.colors.error;
-      default: return 'transparent';
-    }
-  }};
-  color: ${({ $variant }) => 
-    $variant ? 'white' : ({ theme }) => theme.colors.text.secondary
-  };
-  border: 1px solid ${({ $variant, theme }) => {
-    switch ($variant) {
-      case 'primary': return theme.colors.primary;
-      case 'danger': return theme.colors.error;
-      default: return theme.colors.border;
-    }
-  }};
-  border-radius: 8px;
-  font-size: 0.875rem;
-  font-weight: 500;
+  padding: 0.5rem 1rem;
+  background: ${({ $variant }) => $variant === 'danger' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(255, 255, 255, 0.05)'};
+  border: 1px solid ${({ $variant }) => $variant === 'danger' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(255, 255, 255, 0.1)'};
+  border-radius: 6px;
+  color: ${({ $variant, theme }) => $variant === 'danger' ? theme.colors.error : theme.colors.text.secondary};
   cursor: pointer;
-  transition: all 0.2s;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
   
   &:hover {
-    transform: translateY(-1px);
-    opacity: 0.9;
-  }
-  
-  svg {
-    width: 16px;
-    height: 16px;
+    background: ${({ $variant }) => $variant === 'danger' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255, 255, 255, 0.08)'};
+    color: ${({ $variant, theme }) => $variant === 'danger' ? theme.colors.error : theme.colors.text.primary};
   }
 `;
 
 const TabsContainer = styled.div`
-  margin-bottom: 2rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  overflow: hidden;
 `;
 
 const TabsList = styled.div`
   display: flex;
-  gap: 0.5rem;
-  border-bottom: 1px solid ${({ theme }) => theme.colors.border};
-  margin-bottom: 1.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  overflow-x: auto;
 `;
 
 const Tab = styled.button<{ $active: boolean }>`
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
-  background: ${({ $active, theme }) => 
-    $active ? theme.colors.primary + '10' : 'transparent'
-  };
-  color: ${({ $active, theme }) => 
-    $active ? theme.colors.primary : theme.colors.text.secondary
-  };
+  padding: 1rem 1.5rem;
+  background: ${({ $active }) => $active ? 'rgba(255, 255, 255, 0.1)' : 'transparent'};
   border: none;
-  border-bottom: 2px solid ${({ $active, theme }) => 
-    $active ? theme.colors.primary : 'transparent'
-  };
+  border-bottom: 3px solid ${({ $active, theme }) => $active ? theme.colors.primary : 'transparent'};
+  color: ${({ $active, theme }) => $active ? theme.colors.text.primary : theme.colors.text.secondary};
+  cursor: pointer;
   font-size: 0.875rem;
   font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
+  white-space: nowrap;
   
   &:hover {
-    color: ${({ theme }) => theme.colors.primary};
-    background: ${({ theme }) => theme.colors.primary + '05'};
-  }
-  
-  svg {
-    width: 16px;
-    height: 16px;
+    background: rgba(255, 255, 255, 0.08);
+    color: ${({ theme }) => theme.colors.text.primary};
   }
 `;
 
 const TabContent = styled.div`
-  min-height: 400px;
+  padding: 2rem;
 `;
 
 const OverviewGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 1.5rem;
   margin-bottom: 2rem;
 `;
 
 const InfoCard = styled.div`
-  background: ${({ theme }) => theme.colors.surface};
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
   padding: 1.5rem;
 `;
 
-const InfoCardHeader = styled.div`
+const InfoCardTitle = styled.h3`
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-  
-  svg {
-    color: ${({ theme }) => theme.colors.primary};
-  }
-`;
-
-const InfoCardTitle = styled.h3`
-  font-size: 1rem;
-  font-weight: 600;
+  gap: 0.5rem;
+  margin: 0 0 1rem 0;
+  font-size: 1.125rem;
   color: ${({ theme }) => theme.colors.text.primary};
-  margin: 0;
-`;
-
-const InfoCardValue = styled.div`
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: ${({ theme }) => theme.colors.text.primary};
-  margin-bottom: 0.5rem;
 `;
 
 const InfoCardDescription = styled.p`
-  font-size: 0.875rem;
+  margin: 0 0 1rem 0;
   color: ${({ theme }) => theme.colors.text.secondary};
-  margin: 0;
-  line-height: 1.5;
+  line-height: 1.6;
 `;
 
-const CrewSection = styled.div``;
+const InfoGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  font-size: 0.875rem;
+`;
 
-const SectionHeader = styled.div`
+const InfoItem = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+`;
+
+const InfoLabel = styled.span`
+  color: ${({ theme }) => theme.colors.text.secondary};
+  font-weight: 500;
+`;
+
+const InfoValue = styled.span`
+  color: ${({ theme }) => theme.colors.text.primary};
+  font-weight: 600;
+`;
+
+const SectionTitle = styled.h2`
+  margin: 0 0 1.5rem 0;
+  font-size: 1.5rem;
+  color: ${({ theme }) => theme.colors.text.primary};
+`;
+
+const CrewSection = styled.div`
+  margin-top: 1rem;
+`;
+
+const CrewSectionHeader = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 1.5rem;
 `;
 
-const SectionTitle = styled.h2`
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: ${({ theme }) => theme.colors.text.primary};
-  margin: 0;
+const AddCrewButton = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: ${({ theme }) => theme.colors.primary};
+  border: none;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: ${({ theme }) => theme.colors.primary}dd;
+  }
 `;
 
 const CrewGrid = styled.div`
@@ -281,34 +306,89 @@ const CrewGrid = styled.div`
 `;
 
 const CrewCard = styled.div`
-  background: ${({ theme }) => theme.colors.surface};
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 12px;
-  padding: 1.25rem;
-  transition: all 0.2s;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 1.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
   
   &:hover {
-    border-color: ${({ theme }) => theme.colors.primary};
-    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.2);
   }
 `;
 
-const CrewMemberName = styled.h4`
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: ${({ theme }) => theme.colors.text.primary};
-  margin: 0 0 0.5rem 0;
+const CrewCardHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
 `;
 
-const CrewRole = styled.span`
-  display: inline-block;
-  padding: 0.25rem 0.75rem;
-  background: ${({ theme }) => theme.colors.primary + '10'};
+const CrewCardActions = styled.div`
+  display: flex;
+  gap: 0.5rem;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  
+  ${CrewCard}:hover & {
+    opacity: 1;
+  }
+`;
+
+const CrewActionButton = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: ${({ theme }) => theme.colors.text.secondary};
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: ${({ theme }) => theme.colors.primary}20;
+    border-color: ${({ theme }) => theme.colors.primary}40;
+    color: ${({ theme }) => theme.colors.primary};
+  }
+  
+  &.danger:hover {
+    background: ${({ theme }) => theme.colors.error}20;
+    border-color: ${({ theme }) => theme.colors.error}40;
+    color: ${({ theme }) => theme.colors.error};
+  }
+`;
+
+const CrewInfo = styled.div`
+  flex: 1;
+`;
+
+const CrewName = styled.h4`
+  margin: 0 0 0.25rem 0;
+  font-size: 1rem;
+  color: ${({ theme }) => theme.colors.text.primary};
+`;
+
+const CrewRole = styled.p`
+  margin: 0;
+  font-size: 0.875rem;
+  color: ${({ theme }) => theme.colors.text.secondary};
+`;
+
+const KeyPersonnelBadge = styled.span`
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  background: ${({ theme }) => theme.colors.primary}20;
   color: ${({ theme }) => theme.colors.primary};
-  border-radius: 16px;
+  border: 1px solid ${({ theme }) => theme.colors.primary}40;
+  border-radius: 12px;
   font-size: 0.75rem;
   font-weight: 500;
-  margin-bottom: 0.75rem;
 `;
 
 const CrewDetails = styled.div`
@@ -346,7 +426,6 @@ const ProjectDetail: React.FC = () => {
   const fetchProjectDetail = async (projectId: number) => {
     setIsLoading(true);
     try {
-      // Mock data - replace with real API calls
       const mockProject: Project = {
         id: projectId,
         title: "Sunset Boulevard",
@@ -407,6 +486,90 @@ const ProjectDetail: React.FC = () => {
     }
   };
 
+  const handleSaveCrewAssignment = async (formData: any) => {
+    try {
+      console.log('Saving crew assignment:', formData);
+      
+      // Mock crew data pro mapování ID na jména
+      const mockCrewMembers = [
+        { id: 1, first_name: "Jana", last_name: "Svobodová", email: "jana.svobodova@email.com" },
+        { id: 2, first_name: "Tomáš", last_name: "Novák", email: "tomas.novak@email.com" },
+        { id: 3, first_name: "Petra", last_name: "Dvořáková", email: "petra.dvorakova@email.com" },
+        { id: 4, first_name: "Martin", last_name: "Černý", email: "martin.cerny@email.com" }
+      ];
+      
+      if (editingAssignment) {
+        // EDIT MODE: Aktualizace existujícího člena
+        setCrewAssignments(prev => prev.map(assignment => 
+          assignment.id === editingAssignment.id 
+            ? {
+                ...assignment,
+                role: formData.role,
+                start_date: formData.start_date,
+                end_date: formData.end_date,
+                daily_rate: Number(formData.daily_rate),
+                is_key_personnel: formData.is_key_personnel
+              }
+            : assignment
+        ));
+      } else {
+        // ADD MODE: Přidání nového člena
+        const selectedMember = mockCrewMembers.find(member => member.id === formData.crew_member_id);
+        
+        if (!selectedMember) {
+          throw new Error('Člen štábu nebyl nalezen');
+        }
+        
+        const newAssignment: CrewAssignment = {
+          id: Date.now(), // Dočasné ID
+          crew_member: {
+            id: formData.crew_member_id,
+            first_name: selectedMember.first_name,
+            last_name: selectedMember.last_name,
+            email: selectedMember.email,
+            primary_position: {
+              title: formData.role,
+              department: { name: "Obecné" }
+            }
+          },
+          role: formData.role,
+          start_date: formData.start_date,
+          end_date: formData.end_date,
+          daily_rate: Number(formData.daily_rate),
+          is_key_personnel: formData.is_key_personnel
+        };
+        
+        setCrewAssignments(prev => [...prev, newAssignment]);
+      }
+      
+      setIsCrewModalOpen(false);
+      setEditingAssignment(null);
+    } catch (error) {
+      console.error('Error saving crew assignment:', error);
+      throw error;
+    }
+  };
+
+  const handleAddCrewMember = () => {
+    setEditingAssignment(null);
+    setIsCrewModalOpen(true);
+  };
+
+  const handleRemoveCrewMember = async (assignmentId: number) => {
+    try {
+      if (confirm('Opravdu chcete odebrat tohoto člena z projektu?')) {
+        setCrewAssignments(prev => prev.filter(assignment => assignment.id !== assignmentId));
+      }
+    } catch (error) {
+      console.error('Error removing crew member:', error);
+    }
+  };
+
+  const handleEditCrewAssignment = (assignment: CrewAssignment) => {
+    setEditingAssignment(assignment);
+    setIsCrewModalOpen(true);
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('cs-CZ', {
       style: 'currency',
@@ -458,18 +621,7 @@ const ProjectDetail: React.FC = () => {
     return (
       <DetailContainer>
         <LoadingState>Načítání detailu projektu...</LoadingState>
-        <CrewAssignmentModal
-        isOpen={isCrewModalOpen}
-        onClose={() => {
-          setIsCrewModalOpen(false);
-          setEditingAssignment(null);
-        }}
-        onSave={handleSaveCrewAssignment}
-        projectId={project.id}
-        assignment={editingAssignment}
-        isEditing={!!editingAssignment}
-      />
-    </DetailContainer>
+      </DetailContainer>
     );
   }
 
@@ -477,18 +629,7 @@ const ProjectDetail: React.FC = () => {
     return (
       <DetailContainer>
         <div>Projekt nenalezen</div>
-        <CrewAssignmentModal
-        isOpen={isCrewModalOpen}
-        onClose={() => {
-          setIsCrewModalOpen(false);
-          setEditingAssignment(null);
-        }}
-        onSave={handleSaveCrewAssignment}
-        projectId={project.id}
-        assignment={editingAssignment}
-        isEditing={!!editingAssignment}
-      />
-    </DetailContainer>
+      </DetailContainer>
     );
   }
 
@@ -567,82 +708,144 @@ const ProjectDetail: React.FC = () => {
 
         <TabContent>
           {activeTab === 'overview' && (
-            <>
-              <InfoCardDescription style={{ marginBottom: '2rem', fontSize: '1rem' }}>
-                {project.description}
-              </InfoCardDescription>
-              
-              <OverviewGrid>
-                <InfoCard>
-                  <InfoCardHeader>
-                    <DollarSign size={20} />
-                    <InfoCardTitle>Celkový rozpočet</InfoCardTitle>
-                  </InfoCardHeader>
-                  <InfoCardValue>{formatCurrency(project.budget_total)}</InfoCardValue>
-                  <InfoCardDescription>
-                    Náklady na štáb: {formatCurrency(calculateTotalCrewCost())}
-                  </InfoCardDescription>
-                </InfoCard>
+            <OverviewGrid>
+              <InfoCard>
+                <InfoCardTitle>
+                  <Film size={20} />
+                  Informace o projektu
+                </InfoCardTitle>
+                <InfoCardDescription>
+                  {project.description}
+                </InfoCardDescription>
+                <InfoGrid>
+                  <InfoItem>
+                    <InfoLabel>Stav projektu</InfoLabel>
+                    <InfoValue>{getStatusLabel(project.status)}</InfoValue>
+                  </InfoItem>
+                  <InfoItem>
+                    <InfoLabel>Doba trvání</InfoLabel>
+                    <InfoValue>{calculateProjectDuration()}</InfoValue>
+                  </InfoItem>
+                  <InfoItem>
+                    <InfoLabel>Začátek natáčení</InfoLabel>
+                    <InfoValue>{formatDate(project.start_date)}</InfoValue>
+                  </InfoItem>
+                  <InfoItem>
+                    <InfoLabel>Konec natáčení</InfoLabel>
+                    <InfoValue>{formatDate(project.end_date)}</InfoValue>
+                  </InfoItem>
+                </InfoGrid>
+              </InfoCard>
 
-                <InfoCard>
-                  <InfoCardHeader>
-                    <Clock size={20} />
-                    <InfoCardTitle>Doba realizace</InfoCardTitle>
-                  </InfoCardHeader>
-                  <InfoCardValue>{calculateProjectDuration()}</InfoCardValue>
-                  <InfoCardDescription>
-                    {formatDate(project.start_date)} - {formatDate(project.end_date)}
-                  </InfoCardDescription>
-                </InfoCard>
+              <InfoCard>
+                <InfoCardTitle>
+                  <DollarSign size={20} />
+                  Rozpočet
+                </InfoCardTitle>
+                <InfoGrid>
+                  <InfoItem>
+                    <InfoLabel>Celkový rozpočet</InfoLabel>
+                    <InfoValue>{formatCurrency(project.budget_total)}</InfoValue>
+                  </InfoItem>
+                  <InfoItem>
+                    <InfoLabel>Náklady štábu</InfoLabel>
+                    <InfoValue>{formatCurrency(calculateTotalCrewCost())}</InfoValue>
+                  </InfoItem>
+                  <InfoItem>
+                    <InfoLabel>Zbývající rozpočet</InfoLabel>
+                    <InfoValue>{formatCurrency(project.budget_total - calculateTotalCrewCost())}</InfoValue>
+                  </InfoItem>
+                  <InfoItem>
+                    <InfoLabel>Využití rozpočtu</InfoLabel>
+                    <InfoValue>{Math.round((calculateTotalCrewCost() / project.budget_total) * 100)}%</InfoValue>
+                  </InfoItem>
+                </InfoGrid>
+              </InfoCard>
 
-                <InfoCard>
-                  <InfoCardHeader>
-                    <MapPin size={20} />
-                    <InfoCardTitle>Hlavní lokace</InfoCardTitle>
-                  </InfoCardHeader>
-                  <InfoCardValue>{project.location_primary}</InfoCardValue>
-                  <InfoCardDescription>
-                    Primární místo natáčení
-                  </InfoCardDescription>
-                </InfoCard>
+              <InfoCard>
+                <InfoCardTitle>
+                  <MapPin size={20} />
+                  Lokace
+                </InfoCardTitle>
+                <InfoGrid>
+                  <InfoItem>
+                    <InfoLabel>Hlavní lokace</InfoLabel>
+                    <InfoValue>{project.location_primary}</InfoValue>
+                  </InfoItem>
+                  <InfoItem>
+                    <InfoLabel>Počet lokací</InfoLabel>
+                    <InfoValue>12 míst</InfoValue>
+                  </InfoItem>
+                </InfoGrid>
+              </InfoCard>
 
-                <InfoCard>
-                  <InfoCardHeader>
-                    <Users size={20} />
-                    <InfoCardTitle>Štáb</InfoCardTitle>
-                  </InfoCardHeader>
-                  <InfoCardValue>{crewAssignments.length} lidí</InfoCardValue>
-                  <InfoCardDescription>
-                    {crewAssignments.filter(a => a.is_key_personnel).length} klíčových pozic
-                  </InfoCardDescription>
-                </InfoCard>
-              </OverviewGrid>
-            </>
+              <InfoCard>
+                <InfoCardTitle>
+                  <Users size={20} />
+                  Tým
+                </InfoCardTitle>
+                <InfoGrid>
+                  <InfoItem>
+                    <InfoLabel>Celkem štábu</InfoLabel>
+                    <InfoValue>{crewAssignments.length} lidí</InfoValue>
+                  </InfoItem>
+                  <InfoItem>
+                    <InfoLabel>Klíčoví pracovníci</InfoLabel>
+                    <InfoValue>{crewAssignments.filter(a => a.is_key_personnel).length} lidí</InfoValue>
+                  </InfoItem>
+                </InfoGrid>
+              </InfoCard>
+            </OverviewGrid>
           )}
 
           {activeTab === 'crew' && (
             <CrewSection>
-              <SectionHeader>
-                <SectionTitle>Přiřazený štáb</SectionTitle>
-                <ActionButton $variant="primary" onClick={handleAddCrewMember}>
+              <CrewSectionHeader>
+                <SectionTitle>Štáb projektu</SectionTitle>
+                <AddCrewButton onClick={handleAddCrewMember}>
                   <Plus size={16} />
                   Přidat člena štábu
-                </ActionButton>
-              </SectionHeader>
-
+                </AddCrewButton>
+              </CrewSectionHeader>
+              
               <CrewGrid>
                 {crewAssignments.map((assignment) => (
-                  <CrewCard key={assignment.id} onClick={() => handleEditCrewAssignment(assignment)}>
-                    <CrewMemberName>
-                      {assignment.crew_member.first_name} {assignment.crew_member.last_name}
-                      {assignment.is_key_personnel && ' ⭐'}
-                    </CrewMemberName>
-                    <CrewRole>{assignment.role}</CrewRole>
-                    <CrewDetails>
-                      <div>
-                        <strong>Oddělení:</strong><br />
-                        {assignment.crew_member.primary_position.department.name}
+                  <CrewCard key={assignment.id}>
+                    <CrewCardHeader>
+                      <CrewInfo>
+                        <CrewName>
+                          {assignment.crew_member.first_name} {assignment.crew_member.last_name}
+                        </CrewName>
+                        <CrewRole>{assignment.role}</CrewRole>
+                      </CrewInfo>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+                        {assignment.is_key_personnel && (
+                          <KeyPersonnelBadge>Klíčový</KeyPersonnelBadge>
+                        )}
+                        <CrewCardActions>
+                          <CrewActionButton 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditCrewAssignment(assignment);
+                            }}
+                            title="Upravit člena"
+                          >
+                            <Edit size={16} />
+                          </CrewActionButton>
+                          <CrewActionButton 
+                            className="danger"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveCrewMember(assignment.id);
+                            }}
+                            title="Odebrat člena"
+                          >
+                            <Trash2 size={16} />
+                          </CrewActionButton>
+                        </CrewCardActions>
                       </div>
+                    </CrewCardHeader>
+                    <CrewDetails>
                       <div>
                         <strong>Denní sazba:</strong><br />
                         {formatCurrency(assignment.daily_rate)}
@@ -684,42 +887,25 @@ const ProjectDetail: React.FC = () => {
           )}
         </TabContent>
       </TabsContainer>
-      <CrewAssignmentModal
-        isOpen={isCrewModalOpen}
-        onClose={() => {
-          setIsCrewModalOpen(false);
-          setEditingAssignment(null);
-        }}
-        onSave={handleSaveCrewAssignment}
-        projectId={project.id}
-        assignment={editingAssignment}
-        isEditing={!!editingAssignment}
-      />
+
+      {/* Modal se renderuje pouze když máme platný projekt */}
+      {project && (
+        <CrewAssignmentModal
+          isOpen={isCrewModalOpen}
+          onClose={() => {
+            setIsCrewModalOpen(false);
+            setEditingAssignment(null);
+          }}
+          onSave={handleSaveCrewAssignment}
+          projectId={project.id}
+          projectStartDate={project.start_date}
+          projectEndDate={project.end_date}
+          assignment={editingAssignment}
+          isEditing={!!editingAssignment}
+        />
+      )}
     </DetailContainer>
   );
 };
 
 export default ProjectDetail;
-
-  const handleSaveCrewAssignment = async (formData: any) => {
-    try {
-      // Mock save - replace with real API call
-      console.log('Saving crew assignment:', formData);
-      await fetchProjectDetail(project!.id); // Refresh data
-      setIsCrewModalOpen(false);
-      setEditingAssignment(null);
-    } catch (error) {
-      console.error('Error saving crew assignment:', error);
-      throw error;
-    }
-  };
-
-  const handleAddCrewMember = () => {
-    setEditingAssignment(null);
-    setIsCrewModalOpen(true);
-  };
-
-  const handleEditCrewAssignment = (assignment: CrewAssignment) => {
-    setEditingAssignment(assignment);
-    setIsCrewModalOpen(true);
-  };

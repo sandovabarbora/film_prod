@@ -31,6 +31,7 @@ interface CrewAssignmentFormData {
   notes: string;
 }
 
+// Rozšířený interface s edit support
 interface CrewAssignmentModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -38,6 +39,8 @@ interface CrewAssignmentModalProps {
   projectId: number;
   projectStartDate: string;
   projectEndDate: string;
+  assignment?: any; // Editovaný assignment
+  isEditing?: boolean; // Edit mode flag
 }
 
 const ModalOverlay = styled.div<{ $isOpen: boolean }>`
@@ -117,13 +120,12 @@ const CrewSelectionSection = styled.div`
 `;
 
 const SectionTitle = styled.h3`
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: ${({ theme }) => theme.colors.text.primary};
-  margin-bottom: 1rem;
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: 1.125rem;
+  color: ${({ theme }) => theme.colors.text.primary};
   
   svg {
     color: ${({ theme }) => theme.colors.primary};
@@ -132,7 +134,7 @@ const SectionTitle = styled.h3`
 
 const SearchContainer = styled.div`
   position: relative;
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
   
   svg {
     position: absolute;
@@ -140,7 +142,8 @@ const SearchContainer = styled.div`
     top: 50%;
     transform: translateY(-50%);
     color: ${({ theme }) => theme.colors.text.secondary};
-    z-index: 1;
+    width: 16px;
+    height: 16px;
   }
 `;
 
@@ -171,25 +174,17 @@ const CrewGrid = styled.div`
   gap: 1rem;
   max-height: 300px;
   overflow-y: auto;
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 10px;
-  padding: 1rem;
-  background: ${({ theme }) => theme.colors.background};
 `;
 
 const CrewCard = styled.div<{ $selected: boolean; $available: boolean }>`
   padding: 1rem;
-  border: 2px solid ${({ $selected, $available, theme }) => {
-    if ($selected) return theme.colors.primary;
-    if (!$available) return theme.colors.gray[600];
-    return theme.colors.border;
-  }};
+  border: 2px solid ${({ $selected, theme }) => 
+    $selected ? theme.colors.primary : theme.colors.border
+  };
   border-radius: 10px;
-  background: ${({ $selected, $available, theme }) => {
-    if ($selected) return theme.colors.primary + '10';
-    if (!$available) return theme.colors.gray[800] + '50';
-    return theme.colors.surface;
-  }};
+  background: ${({ $selected, theme }) => 
+    $selected ? theme.colors.primary + '10' : theme.colors.background
+  };
   cursor: ${({ $available }) => $available ? 'pointer' : 'not-allowed'};
   transition: all 0.2s;
   opacity: ${({ $available }) => $available ? 1 : 0.6};
@@ -244,33 +239,29 @@ const AvailabilityBadge = styled.span<{ $available: boolean }>`
 `;
 
 const FormSection = styled.div`
-  display: grid;
-  gap: 1.5rem;
+  border-top: 1px solid ${({ theme }) => theme.colors.border};
+  padding-top: 2rem;
+`;
+
+const FormGroup = styled.div`
+  margin-bottom: 1.5rem;
 `;
 
 const FormRow = styled.div`
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1rem;
-  
-  @media (max-width: 600px) {
-    grid-template-columns: 1fr;
-  }
-`;
-
-const FormGroup = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  margin-bottom: 1.5rem;
 `;
 
 const Label = styled.label`
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: ${({ theme }) => theme.colors.text.primary};
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: ${({ theme }) => theme.colors.text.primary};
   
   svg {
     width: 16px;
@@ -280,6 +271,7 @@ const Label = styled.label`
 `;
 
 const Input = styled.input`
+  width: 100%;
   padding: 0.75rem 1rem;
   background: ${({ theme }) => theme.colors.background};
   border: 1px solid ${({ theme }) => theme.colors.border};
@@ -300,15 +292,16 @@ const Input = styled.input`
 `;
 
 const TextArea = styled.textarea`
+  width: 100%;
+  min-height: 80px;
   padding: 0.75rem 1rem;
   background: ${({ theme }) => theme.colors.background};
   border: 1px solid ${({ theme }) => theme.colors.border};
   border-radius: 10px;
   color: ${({ theme }) => theme.colors.text.primary};
   font-size: 0.875rem;
-  resize: vertical;
-  min-height: 80px;
   font-family: inherit;
+  resize: vertical;
   transition: all 0.2s;
   
   &:focus {
@@ -322,19 +315,10 @@ const TextArea = styled.textarea`
   }
 `;
 
-const CheckboxContainer = styled.label`
+const CheckboxContainer = styled.div`
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  cursor: pointer;
-  padding: 0.75rem;
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 10px;
-  transition: all 0.2s;
-  
-  &:hover {
-    background: ${({ theme }) => theme.colors.border};
-  }
 `;
 
 const Checkbox = styled.input`
@@ -343,15 +327,18 @@ const Checkbox = styled.input`
   accent-color: ${({ theme }) => theme.colors.primary};
 `;
 
-const CheckboxLabel = styled.span`
-  font-size: 0.875rem;
-  color: ${({ theme }) => theme.colors.text.primary};
+const CheckboxLabel = styled.label`
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  font-size: 0.875rem;
+  color: ${({ theme }) => theme.colors.text.primary};
+  cursor: pointer;
   
   svg {
-    color: ${({ theme }) => theme.colors.warning};
+    width: 16px;
+    height: 16px;
+    color: ${({ theme }) => theme.colors.primary};
   }
 `;
 
@@ -359,8 +346,7 @@ const ModalActions = styled.div`
   display: flex;
   gap: 1rem;
   margin-top: 2rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid ${({ theme }) => theme.colors.border};
+  justify-content: flex-end;
 `;
 
 const Button = styled.button<{ $variant?: 'primary' | 'secondary' }>`
@@ -410,7 +396,9 @@ const CrewAssignmentModal: React.FC<CrewAssignmentModalProps> = ({
   onSave,
   projectId,
   projectStartDate,
-  projectEndDate
+  projectEndDate,
+  assignment,
+  isEditing = false
 }) => {
   const [crewMembers, setCrewMembers] = useState<CrewMember[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -431,23 +419,58 @@ const CrewAssignmentModal: React.FC<CrewAssignmentModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       fetchCrewMembers();
+      
+      // Pre-populate form data for editing
+      if (isEditing && assignment) {
+        setFormData({
+          crew_member_id: assignment.crew_member.id,
+          role: assignment.role,
+          start_date: assignment.start_date,
+          end_date: assignment.end_date,
+          daily_rate: assignment.daily_rate,
+          is_key_personnel: assignment.is_key_personnel,
+          notes: assignment.notes || '',
+        });
+        
+        // Pre-select crew member for editing
+        setSelectedCrewMember({
+          id: assignment.crew_member.id,
+          first_name: assignment.crew_member.first_name,
+          last_name: assignment.crew_member.last_name,
+          email: assignment.crew_member.email,
+          phone_primary: '',
+          primary_position: assignment.crew_member.primary_position,
+          is_available: true
+        });
+      } else {
+        // Reset for new assignment
+        setFormData({
+          crew_member_id: 0,
+          role: '',
+          start_date: projectStartDate,
+          end_date: projectEndDate,
+          daily_rate: '',
+          is_key_personnel: false,
+          notes: '',
+        });
+        setSelectedCrewMember(null);
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, isEditing, assignment, projectStartDate, projectEndDate]);
 
   useEffect(() => {
-    if (selectedCrewMember) {
+    if (selectedCrewMember && !isEditing) {
       setFormData(prev => ({
         ...prev,
         crew_member_id: selectedCrewMember.id,
         role: selectedCrewMember.primary_position.title,
       }));
     }
-  }, [selectedCrewMember]);
+  }, [selectedCrewMember, isEditing]);
 
   const fetchCrewMembers = async () => {
     setIsLoadingCrew(true);
     try {
-      // Mock data - replace with real API call
       const mockCrewMembers: CrewMember[] = [
         {
           id: 1,
@@ -529,7 +552,7 @@ const CrewAssignmentModal: React.FC<CrewAssignmentModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedCrewMember) return;
+    if (!selectedCrewMember && !isEditing) return;
 
     setIsLoading(true);
     try {
@@ -559,7 +582,7 @@ const CrewAssignmentModal: React.FC<CrewAssignmentModalProps> = ({
         <ModalHeader>
           <ModalTitle>
             <User />
-            Přiřadit člena štábu
+            {isEditing ? 'Upravit přiřazení štábu' : 'Přiřadit člena štábu'}
           </ModalTitle>
           <CloseButton onClick={onClose}>
             <X />
@@ -567,58 +590,66 @@ const CrewAssignmentModal: React.FC<CrewAssignmentModalProps> = ({
         </ModalHeader>
 
         <form onSubmit={handleSubmit}>
-          <CrewSelectionSection>
-            <SectionTitle>
-              <Search />
-              Vybrat člena štábu
-            </SectionTitle>
-            
-            <SearchContainer>
-              <Search size={16} />
-              <SearchInput
-                type="text"
-                placeholder="Hledat podle jména, pozice nebo oddělení..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </SearchContainer>
+          {!isEditing && (
+            <CrewSelectionSection>
+              <SectionTitle>
+                <Search />
+                Vybrat člena štábu
+              </SectionTitle>
+              
+              <SearchContainer>
+                <Search size={16} />
+                <SearchInput
+                  type="text"
+                  placeholder="Hledat podle jména, pozice nebo oddělení..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </SearchContainer>
 
-            {isLoadingCrew ? (
-              <div style={{ textAlign: 'center', padding: '2rem' }}>
-                Načítání štábu...
-              </div>
-            ) : (
-              <CrewGrid>
-                {filteredCrewMembers.map((member) => (
-                  <CrewCard
-                    key={member.id}
-                    $selected={selectedCrewMember?.id === member.id}
-                    $available={member.is_available}
-                    onClick={() => member.is_available && setSelectedCrewMember(member)}
-                  >
-                    <CrewName>
-                      {member.first_name} {member.last_name}
-                    </CrewName>
-                    <CrewPosition>{member.primary_position.title}</CrewPosition>
-                    <CrewDepartment>{member.primary_position.department.name}</CrewDepartment>
-                    <CrewMeta>
-                      <span>{member.experience_years} let zkušeností</span>
-                      <AvailabilityBadge $available={member.is_available}>
-                        {member.is_available ? 'Dostupný' : 'Nedostupný'}
-                      </AvailabilityBadge>
-                    </CrewMeta>
-                  </CrewCard>
-                ))}
-              </CrewGrid>
-            )}
-          </CrewSelectionSection>
+              {isLoadingCrew ? (
+                <div style={{ textAlign: 'center', padding: '2rem' }}>
+                  Načítání štábu...
+                </div>
+              ) : (
+                <CrewGrid>
+                  {filteredCrewMembers.map((member) => (
+                    <CrewCard
+                      key={member.id}
+                      $selected={selectedCrewMember?.id === member.id}
+                      $available={member.is_available}
+                      onClick={() => member.is_available && setSelectedCrewMember(member)}
+                    >
+                      <CrewName>
+                        {member.first_name} {member.last_name}
+                      </CrewName>
+                      <CrewPosition>{member.primary_position.title}</CrewPosition>
+                      <CrewDepartment>{member.primary_position.department.name}</CrewDepartment>
+                      <CrewMeta>
+                        <span>{member.experience_years} let zkušeností</span>
+                        <AvailabilityBadge $available={member.is_available}>
+                          {member.is_available ? 'Dostupný' : 'Nedostupný'}
+                        </AvailabilityBadge>
+                      </CrewMeta>
+                    </CrewCard>
+                  ))}
+                </CrewGrid>
+              )}
+            </CrewSelectionSection>
+          )}
 
-          {selectedCrewMember && (
+          {(selectedCrewMember || isEditing) && (
             <FormSection>
               <SectionTitle>
                 <Briefcase />
                 Detaily přiřazení
               </SectionTitle>
+
+              {isEditing && (
+                <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '10px' }}>
+                  <strong>Editovaný člen:</strong> {assignment?.crew_member.first_name} {assignment?.crew_member.last_name} ({assignment?.crew_member.email})
+                </div>
+              )}
 
               <FormGroup>
                 <Label>
@@ -713,10 +744,10 @@ const CrewAssignmentModal: React.FC<CrewAssignmentModalProps> = ({
             <Button 
               type="submit" 
               $variant="primary" 
-              disabled={isLoading || !selectedCrewMember}
+              disabled={isLoading || (!selectedCrewMember && !isEditing)}
             >
               <Save />
-              {isLoading ? 'Přiřazování...' : 'Přiřadit ke štábu'}
+              {isLoading ? 'Ukládání...' : isEditing ? 'Uložit změny' : 'Přiřadit ke štábu'}
             </Button>
           </ModalActions>
         </form>
