@@ -1,5 +1,2 @@
-export { 
-  AppLayout, 
-  ControlledAppLayout, 
-  useSidebarLayout 
-} from './AppLayout';
+export { default } from './AppLayout';
+export * from './AppLayout';

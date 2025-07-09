@@ -1,11 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Card, GlassCard, CardHeader, CardContent } from '../../ui/Card';
-import { PrimaryButton, SecondaryButton, OutlineButton } from '../../ui/Button';
+import { Card } from '../../ui/Card';
+import { Button } from '../../ui/Button';
+import { DocumentSearch } from './DocumentSearch';
 import { DocumentList } from './DocumentList';
 import { DocumentViewer } from './DocumentViewer';
 import { DocumentUploader } from './DocumentUploader';
-import { DocumentSearch } from './DocumentSearch';
 import { VersionControl } from './VersionControl';
 
 interface Document {
@@ -13,11 +13,10 @@ interface Document {
   title: string;
   filename: string;
   description?: string;
-  type: 'script' | 'contract' | 'callsheet' | 'storyboard' | 'concept' | 'legal' | 'schedule' | 'other';
-  category: 'pre_production' | 'production' | 'post_production' | 'admin' | 'legal';
-  status: 'draft' | 'review' | 'approved' | 'final' | 'archived';
+  type: string;
+  status: string;
   version: string;
-  size: number; // bytes
+  size: number;
   mimeType: string;
   uploadedBy: string;
   uploadedAt: string;
@@ -28,314 +27,664 @@ interface Document {
     canEdit: string[];
     canApprove: string[];
   };
-  versions: DocumentVersion[];
-  comments: DocumentComment[];
-  relatedTasks?: string[];
+  versions: any[];
+  comments: any[];
   approvalRequired?: boolean;
   approvedBy?: string;
   approvedAt?: string;
 }
 
-interface DocumentVersion {
-  id: string;
-  version: string;
-  filename: string;
-  size: number;
+interface SearchFilters {
+  query: string;
+  type: string;
+  status: string;
+  dateFrom: string;
+  dateTo: string;
+  tags: string[];
   uploadedBy: string;
-  uploadedAt: string;
-  changeLog: string;
-  status: 'draft' | 'review' | 'approved' | 'final';
-}
-
-interface DocumentComment {
-  id: string;
-  author: string;
-  content: string;
-  timestamp: string;
-  type: 'comment' | 'suggestion' | 'approval' | 'rejection';
-  resolved?: boolean;
+  sortBy: 'name' | 'date' | 'size' | 'type';
+  sortDirection: 'asc' | 'desc';
 }
 
 interface DocumentManagerProps {
-  projectId: string;
-  documents: Document[];
+  projectId?: string;
   currentUser: {
-    id: string;
     name: string;
     role: string;
     permissions: string[];
   };
-  onDocumentUpload?: (file: File, metadata: Partial<Document>) => void;
-  onDocumentUpdate?: (documentId: string, updates: Partial<Document>) => void;
-  onDocumentDelete?: (documentId: string) => void;
-  onVersionUpload?: (documentId: string, file: File, changeLog: string) => void;
-  onCommentAdd?: (documentId: string, comment: Omit<DocumentComment, 'id' | 'timestamp'>) => void;
-  onApprovalRequest?: (documentId: string) => void;
-  onApprovalAction?: (documentId: string, action: 'approve' | 'reject', comment?: string) => void;
+  onDocumentSelect?: (document: Document) => void;
+  showUploader?: boolean;
+  showSearch?: boolean;
+  maxHeight?: string;
+  readonly?: boolean;
 }
 
-type ViewMode = 'grid' | 'list' | 'viewer' | 'upload' | 'versions';
-
-export function DocumentManager({ 
-  projectId, 
-  documents, 
+export function DocumentManager({
+  projectId,
   currentUser,
-  onDocumentUpload,
-  onDocumentUpdate,
-  onDocumentDelete,
-  onVersionUpload,
-  onCommentAdd,
-  onApprovalRequest,
-  onApprovalAction
+  onDocumentSelect,
+  showUploader = true,
+  showSearch = true,
+  maxHeight = '600px',
+  readonly = false
 }: DocumentManagerProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
-  const [selectedDocument, setSelectedDocument] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState<string>('all');
-  const [filterCategory, setFilterCategory] = useState<string>('all');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<string>('lastModified');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  // State management
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [filteredDocuments, setFilteredDocuments] = useState<Document[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Výpočet document analytics
-  const documentAnalytics = useMemo(() => {
-    const totalDocs = documents.length;
-    const totalSize = documents.reduce((sum, doc) => sum + doc.size, 0);
-    
-    const byStatus = {
-      draft: documents.filter(d => d.status === 'draft').length,
-      review: documents.filter(d => d.status === 'review').length,
-      approved: documents.filter(d => d.status === 'approved').length,
-      final: documents.filter(d => d.status === 'final').length,
-      archived: documents.filter(d => d.status === 'archived').length
-    };
+  // View state
+  const [currentView, setCurrentView] = useState<'list' | 'viewer' | 'uploader' | 'versions'>('list');
+  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+  const [searchFilters, setSearchFilters] = useState<SearchFilters>({
+    query: '',
+    type: 'all',
+    status: 'all',
+    dateFrom: '',
+    dateTo: '',
+    tags: [],
+    uploadedBy: 'all',
+    sortBy: 'date',
+    sortDirection: 'desc'
+  });
 
-    const byType = {
-      script: documents.filter(d => d.type === 'script').length,
-      contract: documents.filter(d => d.type === 'contract').length,
-      callsheet: documents.filter(d => d.type === 'callsheet').length,
-      storyboard: documents.filter(d => d.type === 'storyboard').length,
-      concept: documents.filter(d => d.type === 'concept').length,
-      legal: documents.filter(d => d.type === 'legal').length,
-      schedule: documents.filter(d => d.type === 'schedule').length,
-      other: documents.filter(d => d.type === 'other').length
-    };
+  // Statistics
+  const [documentStats, setDocumentStats] = useState({
+    total: 0,
+    byType: {} as Record<string, number>,
+    byStatus: {} as Record<string, number>,
+    totalSize: 0,
+    recentUploads: 0
+  });
 
-    const pendingApprovals = documents.filter(d => 
-      d.approvalRequired && d.status === 'review'
-    ).length;
+  // Data fetching
+  useEffect(() => {
+    fetchDocuments();
+  }, [projectId]);
 
-    const recentlyModified = documents.filter(d => {
-      const modifiedDate = new Date(d.lastModified);
-      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-      return modifiedDate > weekAgo;
-    }).length;
+  useEffect(() => {
+    applyFilters();
+  }, [documents, searchFilters]);
 
-    return {
-      totalDocs,
-      totalSize,
-      byStatus,
-      byType,
-      pendingApprovals,
-      recentlyModified
-    };
-  }, [documents]);
+  const fetchDocuments = async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-  // Filtrování a vyhledávání dokumentů
-  const filteredDocuments = useMemo(() => {
-    return documents.filter(doc => {
-      // Search query
-      const matchesSearch = searchQuery === '' || 
-        doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        doc.filename.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        doc.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        doc.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Filters
-      const matchesType = filterType === 'all' || doc.type === filterType;
-      const matchesCategory = filterCategory === 'all' || doc.category === filterCategory;
-      const matchesStatus = filterStatus === 'all' || doc.status === filterStatus;
+      // Mock data
+      const mockDocuments: Document[] = [
+        {
+          id: '1',
+          title: 'Hlavní scénář',
+          filename: 'scenar_v3.pdf',
+          description: 'Finální verze scénáře po revizi',
+          type: 'script',
+          status: 'final',
+          version: '3.0',
+          size: 2048576,
+          mimeType: 'application/pdf',
+          uploadedBy: 'Jana Novákova',
+          uploadedAt: '2024-12-01T10:00:00Z',
+          lastModified: '2024-12-10T14:30:00Z',
+          tags: ['scénář', 'finální', 'revize'],
+          permissions: {
+            canView: ['all'],
+            canEdit: ['Jana Novákova', currentUser.name],
+            canApprove: ['admin']
+          },
+          versions: [
+            { version: '3.0', uploadedAt: '2024-12-10T14:30:00Z', uploadedBy: 'Jana Novákova' },
+            { version: '2.1', uploadedAt: '2024-12-05T09:15:00Z', uploadedBy: 'Jana Novákova' },
+            { version: '2.0', uploadedAt: '2024-11-28T16:45:00Z', uploadedBy: 'Petr Svoboda' }
+          ],
+          comments: [],
+          approvalRequired: true,
+          approvedBy: 'Admin',
+          approvedAt: '2024-12-10T15:00:00Z'
+        },
+        {
+          id: '2',
+          title: 'Natáčecí harmonogram',
+          filename: 'harmonogram_prosinec.xlsx',
+          description: 'Detailní harmonogram natáčení pro prosinec',
+          type: 'schedule',
+          status: 'approved',
+          version: '1.2',
+          size: 512000,
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          uploadedBy: 'Tomáš Dvořák',
+          uploadedAt: '2024-11-25T08:00:00Z',
+          lastModified: '2024-12-08T11:20:00Z',
+          tags: ['harmonogram', 'prosinec', 'natáčení'],
+          permissions: {
+            canView: ['all'],
+            canEdit: ['Tomáš Dvořák', 'admin'],
+            canApprove: ['admin']
+          },
+          versions: [
+            { version: '1.2', uploadedAt: '2024-12-08T11:20:00Z', uploadedBy: 'Tomáš Dvořák' },
+            { version: '1.1', uploadedAt: '2024-12-01T10:00:00Z', uploadedBy: 'Tomáš Dvořák' }
+          ],
+          comments: [
+            {
+              id: '1',
+              author: 'Marie Svobodová',
+              content: 'Harmonogram vypadá dobře, jen bych upravila časy pro scénu 15.',
+              timestamp: '2024-12-08T12:00:00Z',
+              type: 'suggestion'
+            }
+          ]
+        },
+        {
+          id: '3',
+          title: 'Rozpočet produkce',
+          filename: 'rozpocet_2024.pdf',
+          description: 'Detailní rozpočet projektu',
+          type: 'budget',
+          status: 'review',
+          version: '2.0',
+          size: 1024000,
+          mimeType: 'application/pdf',
+          uploadedBy: 'Lukáš Černý',
+          uploadedAt: '2024-12-05T14:00:00Z',
+          lastModified: '2024-12-09T09:30:00Z',
+          tags: ['rozpočet', '2024', 'produkce'],
+          permissions: {
+            canView: ['admin', 'Lukáš Černý'],
+            canEdit: ['Lukáš Černý'],
+            canApprove: ['admin']
+          },
+          versions: [
+            { version: '2.0', uploadedAt: '2024-12-09T09:30:00Z', uploadedBy: 'Lukáš Černý' },
+            { version: '1.0', uploadedAt: '2024-12-05T14:00:00Z', uploadedBy: 'Lukáš Černý' }
+          ],
+          comments: [],
+          approvalRequired: true
+        }
+      ];
 
-      return matchesSearch && matchesType && matchesCategory && matchesStatus;
-    });
-  }, [documents, searchQuery, filterType, filterCategory, filterStatus]);
+      setDocuments(mockDocuments);
+      calculateStats(mockDocuments);
 
-  // Řazení dokumentů
-  const sortedDocuments = useMemo(() => {
-    return [...filteredDocuments].sort((a, b) => {
-      let aVal: any = a[sortBy as keyof Document];
-      let bVal: any = b[sortBy as keyof Document];
-
-      if (sortBy === 'lastModified' || sortBy === 'uploadedAt') {
-        aVal = new Date(aVal).getTime();
-        bVal = new Date(bVal).getTime();
-      }
-
-      if (sortBy === 'size') {
-        aVal = Number(aVal);
-        bVal = Number(bVal);
-      }
-
-      if (typeof aVal === 'string') {
-        aVal = aVal.toLowerCase();
-        bVal = bVal.toLowerCase();
-      }
-
-      const result = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
-      return sortOrder === 'asc' ? result : -result;
-    });
-  }, [filteredDocuments, sortBy, sortOrder]);
-
-  const handleDocumentSelect = (documentId: string) => {
-    setSelectedDocument(documentId);
-    setViewMode('viewer');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Chyba při načítání dokumentů');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleUploadSuccess = (file: File, metadata: Partial<Document>) => {
-    if (onDocumentUpload) {
-      onDocumentUpload(file, metadata);
+  const calculateStats = (docs: Document[]) => {
+    const byType: Record<string, number> = {};
+    const byStatus: Record<string, number> = {};
+    let totalSize = 0;
+    let recentUploads = 0;
+
+    const weekAgo = new Date();
+    weekAgo.setDate(weekAgo.getDate() - 7);
+
+    docs.forEach(doc => {
+      // Count by type
+      byType[doc.type] = (byType[doc.type] || 0) + 1;
+      
+      // Count by status
+      byStatus[doc.status] = (byStatus[doc.status] || 0) + 1;
+      
+      // Total size
+      totalSize += doc.size;
+      
+      // Recent uploads
+      if (new Date(doc.uploadedAt) > weekAgo) {
+        recentUploads++;
+      }
+    });
+
+    setDocumentStats({
+      total: docs.length,
+      byType,
+      byStatus,
+      totalSize,
+      recentUploads
+    });
+  };
+
+  const applyFilters = () => {
+    let filtered = [...documents];
+
+    // Text search
+    if (searchFilters.query) {
+      const query = searchFilters.query.toLowerCase();
+      filtered = filtered.filter(doc =>
+        doc.title.toLowerCase().includes(query) ||
+        doc.filename.toLowerCase().includes(query) ||
+        doc.description?.toLowerCase().includes(query) ||
+        doc.tags.some(tag => tag.toLowerCase().includes(query))
+      );
     }
-    setViewMode('grid');
+
+    // Type filter
+    if (searchFilters.type !== 'all') {
+      filtered = filtered.filter(doc => doc.type === searchFilters.type);
+    }
+
+    // Status filter
+    if (searchFilters.status !== 'all') {
+      filtered = filtered.filter(doc => doc.status === searchFilters.status);
+    }
+
+    // Date filters
+    if (searchFilters.dateFrom) {
+      filtered = filtered.filter(doc => 
+        new Date(doc.lastModified) >= new Date(searchFilters.dateFrom)
+      );
+    }
+
+    if (searchFilters.dateTo) {
+      filtered = filtered.filter(doc => 
+        new Date(doc.lastModified) <= new Date(searchFilters.dateTo)
+      );
+    }
+
+    // Tags filter
+    if (searchFilters.tags.length > 0) {
+      filtered = filtered.filter(doc =>
+        searchFilters.tags.some(tag => doc.tags.includes(tag))
+      );
+    }
+
+    // User filter
+    if (searchFilters.uploadedBy !== 'all') {
+      filtered = filtered.filter(doc => doc.uploadedBy === searchFilters.uploadedBy);
+    }
+
+    // Sorting
+    filtered.sort((a, b) => {
+      let comparison = 0;
+
+      switch (searchFilters.sortBy) {
+        case 'name':
+          comparison = a.title.localeCompare(b.title);
+          break;
+        case 'date':
+          comparison = new Date(a.lastModified).getTime() - new Date(b.lastModified).getTime();
+          break;
+        case 'size':
+          comparison = a.size - b.size;
+          break;
+        case 'type':
+          comparison = a.type.localeCompare(b.type);
+          break;
+      }
+
+      return searchFilters.sortDirection === 'asc' ? comparison : -comparison;
+    });
+
+    setFilteredDocuments(filtered);
+  };
+
+  // Event handlers
+  const handleSearch = (filters: SearchFilters) => {
+    setSearchFilters(filters);
+  };
+
+  const handleResetSearch = () => {
+    setSearchFilters({
+      query: '',
+      type: 'all',
+      status: 'all',
+      dateFrom: '',
+      dateTo: '',
+      tags: [],
+      uploadedBy: 'all',
+      sortBy: 'date',
+      sortDirection: 'desc'
+    });
+  };
+
+  const handleDocumentSelect = (document: Document) => {
+    setSelectedDocument(document);
+    setCurrentView('viewer');
+    onDocumentSelect?.(document);
+  };
+
+  const handleDocumentEdit = (document: Document) => {
+    console.log('Edit document:', document.id);
+    // TODO: Implement document editing
+  };
+
+  const handleDocumentDelete = async (documentId: string) => {
+    if (!confirm('Opravdu chcete smazat tento dokument?')) return;
+
+    try {
+      // TODO: Implement API call
+      setDocuments(prev => prev.filter(doc => doc.id !== documentId));
+      console.log('Document deleted:', documentId);
+    } catch (error) {
+      console.error('Failed to delete document:', error);
+      alert('Smazání dokumentu se nezdařilo');
+    }
+  };
+
+  const handleDocumentDownload = (document: Document) => {
+    console.log('Download document:', document.id);
+    // TODO: Implement download
+  };
+
+  const handleDocumentUpload = async (files: File[], metadata: any) => {
+    try {
+      // TODO: Implement API upload
+      console.log('Uploading files:', files, metadata);
+      
+      // Simulate upload
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Refresh documents list
+      await fetchDocuments();
+      
+      setCurrentView('list');
+      alert('Dokumenty byly úspěšně nahrány');
+    } catch (error) {
+      console.error('Upload failed:', error);
+      throw error;
+    }
+  };
+
+  const handleCommentAdd = (documentId: string, comment: any) => {
+    setDocuments(prev => prev.map(doc => 
+      doc.id === documentId 
+        ? { ...doc, comments: [...doc.comments, comment] }
+        : doc
+    ));
+  };
+
+  const handleApprovalAction = (documentId: string, action: 'approve' | 'reject', comment?: string) => {
+    setDocuments(prev => prev.map(doc => 
+      doc.id === documentId 
+        ? { 
+            ...doc, 
+            status: action === 'approve' ? 'approved' : 'review',
+            approvedBy: action === 'approve' ? currentUser.name : undefined,
+            approvedAt: action === 'approve' ? new Date().toISOString() : undefined
+          }
+        : doc
+    ));
   };
 
   const formatFileSize = (bytes: number) => {
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    if (bytes === 0) return '0 B';
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const getDocumentTypeIcon = (type: string) => {
-    const icons = {
-      script: '📝',
-      contract: '📄', 
-      callsheet: '📋',
-      storyboard: '🎨',
-      concept: '💡',
-      legal: '⚖️',
-      schedule: '📅',
-      other: '📎'
-    };
-    return icons[type as keyof typeof icons] || '📎';
+  const getAvailableTypes = () => {
+    return Array.from(new Set(documents.map(doc => doc.type)));
   };
 
-  const getStatusColor = (status: string) => {
-    const colors = {
-      draft: '#6B7280',
-      review: '#F59E0B',
-      approved: '#10B981',
-      final: '#3B82F6',
-      archived: '#9CA3AF'
-    };
-    return colors[status as keyof typeof colors] || '#6B7280';
+  const getAvailableStatuses = () => {
+    return Array.from(new Set(documents.map(doc => doc.status)));
   };
+
+  const getAvailableTags = () => {
+    const allTags = documents.flatMap(doc => doc.tags);
+    return Array.from(new Set(allTags));
+  };
+
+  const getAvailableUsers = () => {
+    return Array.from(new Set(documents.map(doc => doc.uploadedBy)));
+  };
+
+  // Render different views
+  const renderContent = () => {
+    switch (currentView) {
+      case 'viewer':
+        return selectedDocument && (
+          <DocumentViewer
+            document={selectedDocument}
+            onClose={() => setCurrentView('list')}
+            onCommentAdd={handleCommentAdd}
+            onApprovalAction={handleApprovalAction}
+            onVersionHistory={() => setCurrentView('versions')}
+            onDownload={handleDocumentDownload}
+            onEdit={handleDocumentEdit}
+            currentUser={currentUser}
+            formatFileSize={formatFileSize}
+          />
+        );
+
+      case 'uploader':
+        return (
+          <DocumentUploader
+            onUpload={handleDocumentUpload}
+            onCancel={() => setCurrentView('list')}
+            currentUser={currentUser}
+          />
+        );
+
+      case 'versions':
+        return selectedDocument && (
+          <VersionControl
+            document={selectedDocument}
+            onBackToViewer={() => setCurrentView('viewer')}
+            currentUser={currentUser}
+            formatFileSize={formatFileSize}
+          />
+        );
+
+      default:
+        return (
+          <>
+            {showSearch && (
+              <DocumentSearch
+                onSearch={handleSearch}
+                onReset={handleResetSearch}
+                initialFilters={searchFilters}
+                availableTypes={getAvailableTypes()}
+                availableStatuses={getAvailableStatuses()}
+                availableTags={getAvailableTags()}
+                availableUsers={getAvailableUsers()}
+                isLoading={loading}
+                resultCount={filteredDocuments.length}
+              />
+            )}
+
+            <DocumentList
+              documents={filteredDocuments}
+              onDocumentSelect={handleDocumentSelect}
+              onDocumentEdit={handleDocumentEdit}
+              onDocumentDelete={handleDocumentDelete}
+              onDocumentDownload={handleDocumentDownload}
+              currentUser={currentUser}
+              formatFileSize={formatFileSize}
+              searchQuery={searchFilters.query}
+              filterType={searchFilters.type}
+              filterStatus={searchFilters.status}
+            />
+          </>
+        );
+    }
+  };
+
+  if (loading) {
+    return (
+      <LoadingContainer>
+        <LoadingSpinner>🔄</LoadingSpinner>
+        <LoadingText>Načítání dokumentů...</LoadingText>
+      </LoadingContainer>
+    );
+  }
+
+  if (error) {
+    return (
+      <ErrorContainer>
+        <ErrorIcon>⚠️</ErrorIcon>
+        <ErrorTitle>Chyba při načítání</ErrorTitle>
+        <ErrorMessage>{error}</ErrorMessage>
+        <Button onClick={fetchDocuments}>
+          Zkusit znovu
+        </Button>
+      </ErrorContainer>
+    );
+  }
 
   return (
-    <DocumentManagerContainer>
-      {/* Document Search & Controls */}
-      <DocumentSearch 
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        filterType={filterType}
-        onFilterTypeChange={setFilterType}
-        filterCategory={filterCategory}
-        onFilterCategoryChange={setFilterCategory}
-        filterStatus={filterStatus}
-        onFilterStatusChange={setFilterStatus}
-        sortBy={sortBy}
-        onSortByChange={setSortBy}
-        sortOrder={sortOrder}
-        onSortOrderChange={setSortOrder}
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
-        analytics={documentAnalytics}
-        onUploadClick={() => setViewMode('upload')}
-        currentUser={currentUser}
-      />
+    <ManagerContainer $maxHeight={maxHeight}>
+      {currentView === 'list' && (
+        <ManagerHeader>
+          <HeaderLeft>
+            <ManagerTitle>📁 Správa dokumentů</ManagerTitle>
+            <StatsBar>
+              <StatItem>
+                <StatNumber>{documentStats.total}</StatNumber>
+                <StatLabel>dokumentů</StatLabel>
+              </StatItem>
+              <StatItem>
+                <StatNumber>{formatFileSize(documentStats.totalSize)}</StatNumber>
+                <StatLabel>celková velikost</StatLabel>
+              </StatItem>
+              <StatItem>
+                <StatNumber>{documentStats.recentUploads}</StatNumber>
+                <StatLabel>nových tento týden</StatLabel>
+              </StatItem>
+            </StatsBar>
+          </HeaderLeft>
 
-      {/* Main Content Area */}
-      <DocumentContent>
-        {viewMode === 'grid' && (
-          <DocumentList 
-            documents={sortedDocuments}
-            viewMode="grid"
-            selectedDocument={selectedDocument}
-            onDocumentSelect={handleDocumentSelect}
-            onDocumentUpdate={onDocumentUpdate}
-            onDocumentDelete={onDocumentDelete}
-            currentUser={currentUser}
-            formatFileSize={formatFileSize}
-            getDocumentTypeIcon={getDocumentTypeIcon}
-            getStatusColor={getStatusColor}
-          />
-        )}
+          {showUploader && !readonly && (
+            <HeaderActions>
+              <Button onClick={() => setCurrentView('uploader')}>
+                📤 Nahrát dokumenty
+              </Button>
+            </HeaderActions>
+          )}
+        </ManagerHeader>
+      )}
 
-        {viewMode === 'list' && (
-          <DocumentList 
-            documents={sortedDocuments}
-            viewMode="list"
-            selectedDocument={selectedDocument}
-            onDocumentSelect={handleDocumentSelect}
-            onDocumentUpdate={onDocumentUpdate}
-            onDocumentDelete={onDocumentDelete}
-            currentUser={currentUser}
-            formatFileSize={formatFileSize}
-            getDocumentTypeIcon={getDocumentTypeIcon}
-            getStatusColor={getStatusColor}
-          />
-        )}
-
-        {viewMode === 'viewer' && selectedDocument && (
-          <DocumentViewer 
-            document={documents.find(d => d.id === selectedDocument)!}
-            onClose={() => {
-              setSelectedDocument(null);
-              setViewMode('grid');
-            }}
-            onCommentAdd={onCommentAdd}
-            onApprovalRequest={onApprovalRequest}
-            onApprovalAction={onApprovalAction}
-            onVersionView={() => setViewMode('versions')}
-            currentUser={currentUser}
-            formatFileSize={formatFileSize}
-            getStatusColor={getStatusColor}
-          />
-        )}
-
-        {viewMode === 'upload' && (
-          <DocumentUploader 
-            projectId={projectId}
-            onUploadSuccess={handleUploadSuccess}
-            onCancel={() => setViewMode('grid')}
-            currentUser={currentUser}
-            existingDocuments={documents}
-          />
-        )}
-
-        {viewMode === 'versions' && selectedDocument && (
-          <VersionControl 
-            document={documents.find(d => d.id === selectedDocument)!}
-            onVersionUpload={onVersionUpload}
-            onBackToViewer={() => setViewMode('viewer')}
-            currentUser={currentUser}
-            formatFileSize={formatFileSize}
-          />
-        )}
-      </DocumentContent>
-    </DocumentManagerContainer>
+      <ManagerContent>
+        {renderContent()}
+      </ManagerContent>
+    </ManagerContainer>
   );
 }
 
 // Styled Components
-const DocumentManagerContainer = styled.div`
+const ManagerContainer = styled.div<{ $maxHeight: string }>`
   display: flex;
   flex-direction: column;
-  gap: ${props => props.theme.spacing.xl};
   height: 100%;
-`;
-
-const DocumentContent = styled.div`
-  flex: 1;
-  min-height: 0;
+  max-height: ${props => props.$maxHeight};
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
   overflow: hidden;
 `;
+
+const ManagerHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+`;
+
+const HeaderLeft = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+`;
+
+const ManagerTitle = styled.h2`
+  margin: 0;
+  color: #fff;
+  font-size: 1.5rem;
+`;
+
+const StatsBar = styled.div`
+  display: flex;
+  gap: 2rem;
+`;
+
+const StatItem = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+`;
+
+const StatNumber = styled.div`
+  color: #667eea;
+  font-size: 1.25rem;
+  font-weight: 700;
+`;
+
+const StatLabel = styled.div`
+  color: #8b8b8b;
+  font-size: 0.75rem;
+  text-align: center;
+`;
+
+const HeaderActions = styled.div`
+  display: flex;
+  gap: 1rem;
+`;
+
+const ManagerContent = styled.div`
+  flex: 1;
+  overflow: auto;
+`;
+
+const LoadingContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  color: #8b8b8b;
+`;
+
+const LoadingSpinner = styled.div`
+  font-size: 2rem;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+`;
+
+const LoadingText = styled.div`
+  font-size: 1rem;
+`;
+
+const ErrorContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  color: #ef4444;
+  text-align: center;
+`;
+
+const ErrorIcon = styled.div`
+  font-size: 3rem;
+  margin-bottom: 1rem;
+`;
+
+const ErrorTitle = styled.h3`
+  margin: 0 0 0.5rem 0;
+  color: #ef4444;
+`;
+
+const ErrorMessage = styled.p`
+  margin: 0 0 2rem 0;
+  color: #8b8b8b;
+`;
+
+export default DocumentManager;

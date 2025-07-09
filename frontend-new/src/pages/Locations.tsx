@@ -1,130 +1,138 @@
 import React, { useState } from 'react';
 import styled from 'styled-components';
-import { MapPin, Plus, Calendar, Clock, Navigation, Cloud, Image } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { 
+  MapPin, Plus, Search, Filter, Camera, Clock,
+  Star, Navigation, Phone, Calendar, Map
+} from 'lucide-react';
+import Button from '../components/ui/Button';
+import Card from '../components/ui/Card';
+import ProjectHeader from '../components/common/ProjectHeader';
+import { useProject } from '../contexts/ProjectContext';
 
-const LocationsContainer = styled.div`
-  padding: 2rem;
+const PageContainer = styled.div`
+  min-height: 100vh;
+  background: ${({ theme }) => theme.colors.background.primary};
+  color: ${({ theme }) => theme.colors.text.primary};
+  font-family: 'JetBrains Mono', monospace;
+`;
+
+const ContentWrapper = styled.div`
   max-width: 1400px;
   margin: 0 auto;
+  padding: 2rem;
 `;
 
-const PageHeader = styled.div`
+const ToolBar = styled.div`
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: center;
   margin-bottom: 2rem;
+  gap: 1rem;
 `;
 
-const Title = styled.h1`
-  font-size: 2.5rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: ${({ theme }) => theme.colors.text.primary};
-`;
-
-const Button = styled.button`
+const LeftActions = styled.div`
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
-  background: ${({ theme }) => theme.colors.primary};
-  color: white;
-  border: none;
+  gap: 1rem;
+  flex: 1;
+`;
+
+const SearchInput = styled.input`
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
+  padding: 0.75rem 1rem;
+  color: #f9fafb;
+  font-family: inherit;
   font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
+  min-width: 300px;
   
-  &:hover {
-    background: ${({ theme }) => theme.colors.primaryDark};
+  &::placeholder {
+    color: #6b7280;
+  }
+  
+  &:focus {
+    outline: none;
+    border-color: #667eea;
   }
 `;
 
 const LocationsGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
   gap: 1.5rem;
 `;
 
-const LocationCard = styled.div`
-  background: ${({ theme }) => theme.colors.gray[800]};
-  border: 1px solid ${({ theme }) => theme.colors.gray[700]};
-  border-radius: 12px;
+const LocationCard = styled(Card)`
   overflow: hidden;
-  transition: all 0.3s;
+  cursor: pointer;
+  transition: transform 0.2s;
   
   &:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    transform: translateY(-2px);
   }
 `;
 
 const LocationImage = styled.div`
-  position: relative;
   width: 100%;
   height: 200px;
-  background: ${({ theme }) => theme.colors.gray[700]};
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  
-  svg {
-    width: 48px;
-    height: 48px;
-    color: ${({ theme }) => theme.colors.text.secondary};
-  }
+  color: #667eea;
+  font-size: 3rem;
 `;
 
-const LocationStatus = styled.div<{ $status: 'confirmed' | 'pending' | 'scouting' }>`
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  background: ${props => {
-    switch (props.$status) {
-      case 'confirmed': return props.theme.colors.success;
-      case 'pending': return props.theme.colors.warning;
-      case 'scouting': return props.theme.colors.primary;
-    }
-  }};
-  color: white;
-  text-transform: uppercase;
-`;
-
-const LocationInfo = styled.div`
+const LocationContent = styled.div`
   padding: 1.5rem;
 `;
 
-const LocationName = styled.h3`
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: ${({ theme }) => theme.colors.text.primary};
-  margin-bottom: 0.5rem;
+const LocationHeader = styled.div`
+  margin-bottom: 1rem;
 `;
 
-const LocationAddress = styled.p`
+const LocationName = styled.h3`
+  margin: 0 0 0.5rem 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+`;
+
+const LocationAddress = styled.div`
+  color: #9ca3af;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+`;
+
+const LocationMeta = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+`;
+
+const SceneCount = styled.div`
   display: flex;
   align-items: center;
   gap: 0.5rem;
   font-size: 0.875rem;
-  color: ${({ theme }) => theme.colors.text.secondary};
-  margin-bottom: 1rem;
-  
-  svg {
-    width: 16px;
-    height: 16px;
-  }
+  color: #667eea;
+`;
+
+const LocationRating = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.875rem;
 `;
 
 const LocationDetails = styled.div`
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
 `;
 
 const DetailItem = styled.div`
@@ -132,182 +140,244 @@ const DetailItem = styled.div`
   align-items: center;
   gap: 0.5rem;
   font-size: 0.875rem;
-  color: ${({ theme }) => theme.colors.text.secondary};
-  
-  svg {
-    width: 16px;
-    height: 16px;
-    color: ${({ theme }) => theme.colors.primary};
-  }
+  color: #9ca3af;
 `;
 
 const LocationActions = styled.div`
   display: flex;
   gap: 0.5rem;
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid ${({ theme }) => theme.colors.gray[700]};
 `;
 
-const ActionButton = styled.button`
-  flex: 1;
-  padding: 0.5rem;
-  background: ${({ theme }) => theme.colors.gray[700]};
-  color: ${({ theme }) => theme.colors.text.secondary};
-  border: none;
-  border-radius: 6px;
-  font-size: 0.875rem;
-  cursor: pointer;
-  transition: all 0.2s;
-  
-  &:hover {
-    background: ${({ theme }) => theme.colors.gray[600]};
-    color: ${({ theme }) => theme.colors.text.primary};
-  }
-`;
-
-const FilterTabs = styled.div`
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 2rem;
-`;
-
-const FilterTab = styled.button<{ $active: boolean }>`
-  padding: 0.5rem 1rem;
-  background: ${props => props.$active ? props.theme.colors.primary + '20' : 'transparent'};
-  color: ${props => props.$active ? props.theme.colors.primary : props.theme.colors.text.secondary};
-  border: 1px solid ${props => props.$active ? props.theme.colors.primary : props.theme.colors.gray[700]};
-  border-radius: 6px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  
-  &:hover {
-    border-color: ${({ theme }) => theme.colors.primary};
-    color: ${({ theme }) => theme.colors.primary};
-  }
+const StatusBadge = styled.div<{ $status: string }>`
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  background: ${({ $status }) => {
+    const colors = {
+      confirmed: '#10b98122',
+      pending: '#f59e0b22',
+      scouted: '#3b82f622'
+    };
+    return colors[$status] || colors.pending;
+  }};
+  color: ${({ $status }) => {
+    const colors = {
+      confirmed: '#10b981',
+      pending: '#f59e0b',
+      scouted: '#3b82f6'
+    };
+    return colors[$status] || colors.pending;
+  }};
+  border: 1px solid ${({ $status }) => {
+    const colors = {
+      confirmed: '#10b981',
+      pending: '#f59e0b',
+      scouted: '#3b82f6'
+    };
+    return colors[$status] || colors.pending;
+  }};
 `;
 
 const Locations: React.FC = () => {
-  const [activeFilter, setActiveFilter] = useState('all');
-  
-  // Mock data
+  const { project } = useProject();
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Mock locations data
   const locations = [
     {
       id: 1,
-      name: 'Downtown Studio - Stage 3',
-      address: '123 Film Street, Prague',
-      status: 'confirmed' as const,
-      shootDates: 'Jan 15-20',
-      time: '7:00 AM - 7:00 PM',
-      weather: 'Cloudy, 12°C',
-      distance: '5.2 km'
+      name: 'Prague Castle',
+      address: 'Hradčany, 119 08 Praha 1',
+      scenes: 5,
+      rating: 4.8,
+      contact: '+420 224 373 368',
+      shootDates: '15-16 July 2025',
+      status: 'confirmed',
+      type: 'Exterior'
     },
     {
       id: 2,
-      name: 'Historic Building Exterior',
-      address: '456 Old Town Square, Prague',
-      status: 'pending' as const,
-      shootDates: 'Jan 22-23',
-      time: '6:00 AM - 2:00 PM',
-      weather: 'Sunny, 15°C',
-      distance: '2.8 km'
+      name: 'Café Louvre',
+      address: 'Národní 116/22, 110 00 Praha 1',
+      scenes: 3,
+      rating: 4.6,
+      contact: '+420 224 930 949',
+      shootDates: '18 July 2025',
+      status: 'confirmed',
+      type: 'Interior'
     },
     {
       id: 3,
-      name: 'Modern Office Interior',
-      address: '789 Business District, Prague',
-      status: 'scouting' as const,
-      shootDates: 'TBD',
-      time: 'TBD',
-      weather: 'Indoor',
-      distance: '8.1 km'
+      name: 'Petřín Tower',
+      address: 'Petřínské sady, 118 00 Praha 1',
+      scenes: 2,
+      rating: 4.9,
+      contact: '+420 257 320 112',
+      shootDates: '20 July 2025',
+      status: 'pending',
+      type: 'Exterior'
     },
     {
       id: 4,
-      name: 'Riverside Park',
-      address: 'Petřín Park, Prague',
-      status: 'confirmed' as const,
-      shootDates: 'Jan 25-26',
-      time: '5:30 AM - 8:00 PM',
-      weather: 'Partly cloudy, 10°C',
-      distance: '3.5 km'
+      name: 'Film Studios Barrandov',
+      address: 'Kříženeckého nám. 1078/5, Praha 5',
+      scenes: 12,
+      rating: 4.7,
+      contact: '+420 267 071 111',
+      shootDates: '22-25 July 2025',
+      status: 'confirmed',
+      type: 'Studio'
+    },
+    {
+      id: 5,
+      name: 'Charles Bridge',
+      address: 'Karlův most, Praha 1',
+      scenes: 4,
+      rating: 4.9,
+      contact: 'Public space',
+      shootDates: 'TBD',
+      status: 'scouted',
+      type: 'Exterior'
+    },
+    {
+      id: 6,
+      name: 'Modern Office Building',
+      address: 'Wenceslas Square 56, Praha 1',
+      scenes: 8,
+      rating: 4.4,
+      contact: '+420 222 555 777',
+      shootDates: '28-29 July 2025',
+      status: 'pending',
+      type: 'Interior'
     }
   ];
-  
-  const filteredLocations = activeFilter === 'all' 
-    ? locations 
-    : locations.filter(loc => loc.status === activeFilter);
+
+  const filteredLocations = locations.filter(location =>
+    location.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    location.address.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const renderStars = (rating: number) => {
+    return Array.from({ length: 5 }, (_, i) => (
+      <Star 
+        key={i} 
+        size={14} 
+        fill={i < Math.floor(rating) ? '#f59e0b' : 'none'} 
+        color="#f59e0b" 
+      />
+    ));
+  };
+
+  if (!project) {
+    return (
+      <PageContainer>
+        <ContentWrapper>
+          <div style={{ textAlign: 'center', padding: '4rem' }}>
+            <h2>Project Not Found</h2>
+            <p>Unable to load project locations</p>
+          </div>
+        </ContentWrapper>
+      </PageContainer>
+    );
+  }
 
   return (
-    <LocationsContainer>
-      <PageHeader>
-        <Title>Locations</Title>
-        <Button>
-          <Plus size={18} />
-          Add Location
-        </Button>
-      </PageHeader>
-      
-      <FilterTabs>
-        <FilterTab $active={activeFilter === 'all'} onClick={() => setActiveFilter('all')}>
-          All Locations ({locations.length})
-        </FilterTab>
-        <FilterTab $active={activeFilter === 'confirmed'} onClick={() => setActiveFilter('confirmed')}>
-          Confirmed ({locations.filter(l => l.status === 'confirmed').length})
-        </FilterTab>
-        <FilterTab $active={activeFilter === 'pending'} onClick={() => setActiveFilter('pending')}>
-          Pending ({locations.filter(l => l.status === 'pending').length})
-        </FilterTab>
-        <FilterTab $active={activeFilter === 'scouting'} onClick={() => setActiveFilter('scouting')}>
-          Scouting ({locations.filter(l => l.status === 'scouting').length})
-        </FilterTab>
-      </FilterTabs>
-      
-      <LocationsGrid>
-        {filteredLocations.map(location => (
-          <LocationCard key={location.id}>
-            <LocationImage>
-              <Image />
-              <LocationStatus $status={location.status}>
-                {location.status}
-              </LocationStatus>
-            </LocationImage>
-            <LocationInfo>
-              <LocationName>{location.name}</LocationName>
-              <LocationAddress>
-                <MapPin />
-                {location.address}
-              </LocationAddress>
-              <LocationDetails>
-                <DetailItem>
-                  <Calendar />
-                  {location.shootDates}
-                </DetailItem>
-                <DetailItem>
-                  <Clock />
-                  {location.time}
-                </DetailItem>
-                <DetailItem>
-                  <Cloud />
-                  {location.weather}
-                </DetailItem>
-                <DetailItem>
-                  <Navigation />
-                  {location.distance}
-                </DetailItem>
-              </LocationDetails>
-              <LocationActions>
-                <ActionButton>View Details</ActionButton>
-                <ActionButton>Get Directions</ActionButton>
-                <ActionButton>Weather</ActionButton>
-              </LocationActions>
-            </LocationInfo>
-          </LocationCard>
-        ))}
-      </LocationsGrid>
-    </LocationsContainer>
+    <PageContainer>
+      <ContentWrapper>
+        <ProjectHeader 
+          title="Filming Locations"
+          subtitle={`Location management for ${project.title}`}
+        >
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <Button variant="ghost" icon={<Map size={16} />}>View Map</Button>
+            <Button variant="primary" icon={<Plus size={16} />}>Add Location</Button>
+          </div>
+        </ProjectHeader>
+
+        <ToolBar>
+          <LeftActions>
+            <SearchInput
+              type="text"
+              placeholder="Search locations..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            <Button variant="ghost" icon={<Filter size={16} />}>Filter</Button>
+          </LeftActions>
+        </ToolBar>
+
+        <LocationsGrid>
+          {filteredLocations.map((location, index) => (
+            <motion.div
+              key={location.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+            >
+              <LocationCard variant="glass">
+                <LocationImage>
+                  <MapPin size={48} />
+                </LocationImage>
+                
+                <LocationContent>
+                  <LocationHeader>
+                    <LocationName>{location.name}</LocationName>
+                    <LocationAddress>
+                      <MapPin size={14} />
+                      {location.address}
+                    </LocationAddress>
+                  </LocationHeader>
+                  
+                  <LocationMeta>
+                    <SceneCount>
+                      <Camera size={16} />
+                      {location.scenes} scenes
+                    </SceneCount>
+                    <LocationRating>
+                      {renderStars(location.rating)}
+                      <span style={{ marginLeft: '0.5rem' }}>{location.rating}</span>
+                    </LocationRating>
+                  </LocationMeta>
+                  
+                  <LocationDetails>
+                    <DetailItem>
+                      <Phone size={16} />
+                      {location.contact}
+                    </DetailItem>
+                    <DetailItem>
+                      <Calendar size={16} />
+                      {location.shootDates}
+                    </DetailItem>
+                    <DetailItem>
+                      <Clock size={16} />
+                      {location.type}
+                    </DetailItem>
+                  </LocationDetails>
+                  
+                  <LocationMeta>
+                    <StatusBadge $status={location.status}>
+                      {location.status}
+                    </StatusBadge>
+                    
+                    <LocationActions>
+                      <Button variant="ghost" size="sm" icon={<Navigation size={14} />}>
+                        Directions
+                      </Button>
+                      <Button variant="ghost" size="sm" icon={<Camera size={14} />}>
+                        Photos
+                      </Button>
+                    </LocationActions>
+                  </LocationMeta>
+                </LocationContent>
+              </LocationCard>
+            </motion.div>
+          ))}
+        </LocationsGrid>
+      </ContentWrapper>
+    </PageContainer>
   );
 };
 

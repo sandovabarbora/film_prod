@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-// API base URL using Vite env variables
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+const AUTH_URL = import.meta.env.VITE_AUTH_URL || 'http://localhost:8000/api/v1/auth';
 
 interface User {
   id: number;
@@ -9,7 +9,9 @@ interface User {
   email: string;
   first_name: string;
   last_name: string;
-  full_name: string;
+  full_name?: string;
+  role?: string;
+  display_name?: string;
 }
 
 interface AuthContextType {
@@ -19,6 +21,7 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
   register: (userData: any) => Promise<void>;
+  refreshToken: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -51,15 +54,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const userData = localStorage.getItem('user');
       
       if (token && userData) {
-        setUser(JSON.parse(userData));
+        const isValid = await verifyToken(token);
+        if (isValid) {
+          setUser(JSON.parse(userData));
+        } else {
+          const refreshed = await refreshToken();
+          if (!refreshed) {
+            logout();
+          }
+        }
       } else if (token) {
-        // Fetch user data if token exists but user data is missing
-        const response = await fetch(`${API_BASE_URL}/auth/me/`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        
-        if (response.ok) {
-          const currentUser = await response.json();
+        const currentUser = await fetchCurrentUser();
+        if (currentUser) {
           setUser(currentUser);
           localStorage.setItem('user', JSON.stringify(currentUser));
         } else {
@@ -74,73 +80,173 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const verifyToken = async (token: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`${AUTH_URL}/me/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  };
+
+  const fetchCurrentUser = async (): Promise<User | null> => {
+    try {
+      const token = localStorage.getItem('access_token');
+      if (!token) return null;
+
+      const response = await fetch(`${AUTH_URL}/me/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      if (response.ok) {
+        return await response.json();
+      }
+      return null;
+    } catch (error) {
+      console.error('Failed to fetch current user:', error);
+      return null;
+    }
+  };
+
   const login = async (username: string, password: string): Promise<void> => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/token/`, {
+      console.log('🔐 Attempting login to:', `${AUTH_URL}/token/`);
+      
+      const response = await fetch(`${AUTH_URL}/token/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username,
+          password,
+        }),
       });
-      
+
+      console.log('📡 Login response status:', response.status);
+
       if (!response.ok) {
-        throw new Error('Invalid credentials');
+        const errorText = await response.text();
+        console.error('❌ Login failed:', errorText);
+        throw new Error(`Login failed: ${response.status}`);
       }
-      
+
       const data = await response.json();
-      localStorage.setItem('access_token', data.access);
-      localStorage.setItem('refresh_token', data.refresh);
-      
-      // Get user info
-      const userResponse = await fetch(`${API_BASE_URL}/auth/me/`, {
-        headers: { Authorization: `Bearer ${data.access}` },
-      });
-      
-      if (userResponse.ok) {
-        const userData = await userResponse.json();
-        setUser(userData);
-        localStorage.setItem('user', JSON.stringify(userData));
+      console.log('✅ Login successful, received data:', Object.keys(data));
+
+      if (data.access) {
+        localStorage.setItem('access_token', data.access);
       }
+      if (data.refresh) {
+        localStorage.setItem('refresh_token', data.refresh);
+      }
+
+      if (data.user) {
+        setUser(data.user);
+        localStorage.setItem('user', JSON.stringify(data.user));
+      } else {
+        const currentUser = await fetchCurrentUser();
+        if (currentUser) {
+          setUser(currentUser);
+          localStorage.setItem('user', JSON.stringify(currentUser));
+        }
+      }
+
+      console.log('🎉 Login completed successfully');
     } catch (error) {
+      console.error('💥 Login error:', error);
+      logout();
       throw error;
     } finally {
       setIsLoading(false);
     }
   };
 
+  const refreshToken = async (): Promise<boolean> => {
+    try {
+      const refresh = localStorage.getItem('refresh_token');
+      if (!refresh) return false;
+
+      const response = await fetch(`${AUTH_URL}/token/refresh/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ refresh }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        localStorage.setItem('access_token', data.access);
+        if (data.refresh) {
+          localStorage.setItem('refresh_token', data.refresh);
+        }
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  };
+
   const logout = (): void => {
+    console.log('🚪 Logging out...');
+    
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('user');
+    
     setUser(null);
+    
+    console.log('✅ Logout completed');
   };
 
   const register = async (userData: any): Promise<void> => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/register/`, {
+      const response = await fetch(`${AUTH_URL}/register/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify(userData),
       });
-      
+
       if (!response.ok) {
-        throw new Error('Registration failed');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Registration failed');
+      }
+
+      const data = await response.json();
+      
+      if (data.tokens) {
+        localStorage.setItem('access_token', data.tokens.access);
+        localStorage.setItem('refresh_token', data.tokens.refresh);
+        
+        if (data.user) {
+          setUser(data.user);
+          localStorage.setItem('user', JSON.stringify(data.user));
+        }
       }
     } catch (error) {
+      console.error('Registration error:', error);
       throw error;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const value: AuthContextType = {
+  const value = {
     user,
     isAuthenticated,
     isLoading,
     login,
     logout,
     register,
+    refreshToken,
   };
 
   return (

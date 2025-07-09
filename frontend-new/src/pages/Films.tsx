@@ -1,415 +1,187 @@
 import React, { useState, useEffect } from 'react';
-import styled from 'styled-components';
 import { useNavigate } from 'react-router-dom';
-import { Film, Search, Plus, Eye, Edit, Trash2 } from 'lucide-react';
-import { useAuth } from '../hooks/useAuth';
-import ProjectEditModal from '../components/features/ProjectEditModal/ProjectEditModal';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Plus, Calendar, DollarSign, MapPin, Play } from 'lucide-react';
 
-interface FilmProject {
-  id: number;
-  title: string;
-  description: string;
-  status: 'development' | 'pre_production' | 'production' | 'post_production' | 'completed' | 'cancelled';
-  start_date: string;
-  end_date: string;
-  budget_total: number;
-  location_primary: string;
-  created_at: string;
-}
+import { Button } from '../components/ui/Button';
+import { 
+  PageContainer,
+  PageHeader,
+  PageSubtitle,
+  ControlsRow,
+  ContentCard,
+  ContentCardHeader,
+  ContentCardTitle,
+  ContentCardFooter,
+  StatusBadge
+} from '../components/shared';
+import projectService from '../services/projectService';
+import type { Project } from '../types';
+import styled from 'styled-components';
 
-// ... (all styled components remain the same)
-
-const FilmsContainer = styled.div`
-  padding: 2rem;
-  max-width: 1400px;
-  margin: 0 auto;
-`;
-
-const PageHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
-`;
-
-const Title = styled.h1`
-  font-size: 2.5rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: ${({ theme }) => theme.colors.text.primary};
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  
-  svg {
-    color: ${({ theme }) => theme.colors.primary};
-  }
-`;
-
-const SearchSection = styled.div`
-  position: relative;
-  margin-bottom: 2rem;
-  
-  svg {
-    position: absolute;
-    left: 1rem;
-    top: 50%;
-    transform: translateY(-50%);
-    color: ${({ theme }) => theme.colors.text.secondary};
-    z-index: 1;
-  }
-`;
-
-const SearchInput = styled.input`
-  width: 100%;
-  padding: 0.75rem 1rem 0.75rem 3rem;
-  background: ${({ theme }) => theme.colors.surface};
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 12px;
-  color: ${({ theme }) => theme.colors.text.primary};
-  font-size: 0.875rem;
-  transition: all 0.2s ease;
-  
-  &::placeholder {
-    color: ${({ theme }) => theme.colors.text.muted};
-  }
-  
-  &:focus {
-    outline: none;
-    border-color: ${({ theme }) => theme.colors.primary};
-    box-shadow: 0 0 0 3px ${({ theme }) => theme.colors.primary}20;
-  }
-`;
-
-const ProjectGrid = styled.div`
+const ProjectsGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: 1.5rem;
-`;
-
-const ProjectCard = styled.div`
-  background: ${({ theme }) => theme.colors.surface};
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 16px;
-  padding: 1.5rem;
-  transition: all 0.3s ease;
-  cursor: pointer;
-  
-  &:hover {
-    transform: translateY(-4px);
-    box-shadow: ${({ theme }) => theme.shadows.lg};
-    border-color: ${({ theme }) => theme.colors.primary};
-  }
-`;
-
-const ProjectHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 1rem;
-`;
-
-const ProjectTitle = styled.h3`
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: ${({ theme }) => theme.colors.text.primary};
-  margin: 0 0 0.5rem 0;
-`;
-
-const StatusBadge = styled.span<{ $status: string }>`
-  padding: 0.25rem 0.75rem;
-  border-radius: 20px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  background: ${({ $status, theme }) => {
-    switch ($status) {
-      case 'development': return theme.colors.info + '20';
-      case 'pre_production': return theme.colors.warning + '20';
-      case 'production': return theme.colors.primary + '20';
-      case 'post_production': return theme.colors.accent.main + '20';
-      case 'completed': return theme.colors.success + '20';
-      case 'cancelled': return theme.colors.gray[500] + '20';
-      default: return theme.colors.gray[500] + '20';
-    }
-  }};
-  color: ${({ $status, theme }) => {
-    switch ($status) {
-      case 'development': return theme.colors.info;
-      case 'pre_production': return theme.colors.warning;
-      case 'production': return theme.colors.primary;
-      case 'post_production': return theme.colors.accent.main;
-      case 'completed': return theme.colors.success;
-      case 'cancelled': return theme.colors.gray[500];
-      default: return theme.colors.gray[500];
-    }
-  }};
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: ${({ theme }) => theme.spacing[6]};
+  margin-bottom: ${({ theme }) => theme.spacing[8]};
 `;
 
 const ProjectDescription = styled.p`
-  color: ${({ theme }) => theme.colors.text.secondary};
-  font-size: 0.875rem;
+  color: ${({ theme }) => theme.colors.text.muted};
+  font-size: ${({ theme }) => theme.typography.fontSize.sm};
   line-height: 1.6;
-  margin-bottom: 1rem;
+  margin-bottom: ${({ theme }) => theme.spacing[4]};
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 `;
 
-const ProjectMeta = styled.div`
+const ProjectMetrics = styled.div`
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  margin-bottom: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid ${({ theme }) => theme.colors.border};
+  gap: ${({ theme }) => theme.spacing[4]};
+  margin-bottom: ${({ theme }) => theme.spacing[4]};
 `;
 
-const MetaItem = styled.div`
+const MetricItem = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.spacing[2]};
+`;
+
+const MetricIcon = styled.div`
+  color: ${({ theme }) => theme.colors.text.accent};
+  display: flex;
+  align-items: center;
+`;
+
+const MetricText = styled.span`
+  color: ${({ theme }) => theme.colors.text.primary};
+  font-size: ${({ theme }) => theme.typography.fontSize.sm};
+  font-weight: 500;
+`;
+
+const ProjectMeta = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: ${({ theme }) => theme.spacing[1]};
 `;
 
 const MetaLabel = styled.span`
-  font-size: 0.75rem;
+  font-size: ${({ theme }) => theme.typography.fontSize.xs};
   color: ${({ theme }) => theme.colors.text.muted};
   text-transform: uppercase;
   letter-spacing: 0.5px;
 `;
 
 const MetaValue = styled.span`
-  font-size: 0.875rem;
+  font-size: ${({ theme }) => theme.typography.fontSize.sm};
   color: ${({ theme }) => theme.colors.text.primary};
   font-weight: 500;
 `;
 
-const ProjectActions = styled.div`
-  display: flex;
-  gap: 0.5rem;
-  margin-top: 1rem;
-  padding-top: 1rem;
-  border-top: 1px solid ${({ theme }) => theme.colors.border};
-`;
-
-const ActionButton = styled.button`
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.5rem;
-  background: transparent;
-  color: ${({ theme }) => theme.colors.text.secondary};
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 8px;
-  font-size: 0.875rem;
-  cursor: pointer;
-  transition: all 0.2s;
-  
-  &:hover {
-    background: ${({ theme }) => theme.colors.primary};
-    color: white;
-    border-color: ${({ theme }) => theme.colors.primary};
-  }
-  
-  svg {
-    width: 16px;
-    height: 16px;
-  }
-`;
-
-const AddButton = styled.button`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
-  background: ${({ theme }) => theme.colors.primary};
-  color: white;
+const PlayButton = styled(motion.button)`
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: ${({ theme }) => theme.colors.gradients.primary};
   border: none;
-  border-radius: 12px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  
-  &:hover {
-    background: ${({ theme }) => theme.colors.primaryDark};
-    transform: translateY(-2px);
-  }
-  
-  svg {
-    width: 16px;
-    height: 16px;
-  }
-`;
-
-const LoadingState = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4rem;
-  color: ${({ theme }) => theme.colors.text.secondary};
-  font-size: 1.125rem;
+  cursor: pointer;
+  box-shadow: ${({ theme }) => theme.shadows.glow};
+  
+  &:hover {
+    box-shadow: ${({ theme }) => theme.shadows.glowHover};
+  }
+`;
+
+const LoadingContainer = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 50vh;
+  color: ${({ theme }) => theme.colors.text.muted};
+  font-size: ${({ theme }) => theme.typography.fontSize.lg};
+`;
+
+const ErrorContainer = styled(motion.div)`
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid #ef4444;
+  border-radius: ${({ theme }) => theme.borderRadius['2xl']};
+  padding: ${({ theme }) => theme.spacing[6]};
+  margin-top: ${({ theme }) => theme.spacing[8]};
+  color: #ef4444;
+  text-align: center;
+  backdrop-filter: ${({ theme }) => theme.cinema.backdrop.light};
 `;
 
 const EmptyState = styled.div`
   text-align: center;
-  padding: 4rem 2rem;
-  color: ${({ theme }) => theme.colors.text.secondary};
+  color: ${({ theme }) => theme.colors.text.muted};
+  padding: ${({ theme }) => theme.spacing[12]};
+  background: ${({ theme }) => theme.colors.glass.surface};
+  backdrop-filter: ${({ theme }) => theme.cinema.backdrop.light};
+  border-radius: ${({ theme }) => theme.borderRadius['2xl']};
+  border: 1px dashed ${({ theme }) => theme.colors.glass.border};
+  
+  .icon {
+    font-size: 3rem;
+    margin-bottom: ${({ theme }) => theme.spacing[4]};
+    opacity: 0.7;
+  }
   
   h3 {
     color: ${({ theme }) => theme.colors.text.primary};
-    margin-bottom: 1rem;
+    margin-bottom: ${({ theme }) => theme.spacing[2]};
   }
 `;
 
 const Films: React.FC = () => {
-  const { user } = useAuth();
   const navigate = useNavigate();
-  const [projects, setProjects] = useState<FilmProject[]>([]);
+  
+  const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingProject, setEditingProject] = useState<FilmProject | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchProjects();
+    loadProjects();
   }, []);
 
-  const fetchProjects = async () => {
+  const loadProjects = async () => {
     try {
       setIsLoading(true);
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/production/`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('access_token')}`,
-        },
-      });
+      setError(null);
       
-      if (response.ok) {
-        const data = await response.json();
-        setProjects(data.results || data);
-      } else {
-        console.error('Failed to fetch projects');
-        // Mock data for development
-        setProjects([
-          {
-            id: 1,
-            title: "Sunset Boulevard",
-            description: "A gripping drama about the golden age of Hollywood, following an aging star's desperate attempt to reclaim her fame.",
-            status: "production",
-            start_date: "2025-06-01",
-            end_date: "2025-09-15",
-            budget_total: 15000000,
-            location_primary: "Los Angeles, CA",
-            created_at: "2025-05-15T10:00:00Z"
-          },
-          {
-            id: 2,
-            title: "Digital Dreams",
-            description: "A sci-fi thriller exploring the boundaries between virtual reality and human consciousness in the near future.",
-            status: "pre_production",
-            start_date: "2025-08-01",
-            end_date: "2025-12-20",
-            budget_total: 8500000,
-            location_primary: "Prague, Czech Republic",
-            created_at: "2025-05-10T14:30:00Z"
-          },
-          {
-            id: 3,
-            title: "The Art of Memory",
-            description: "An intimate documentary following three artists as they create works inspired by childhood memories.",
-            status: "post_production",
-            start_date: "2025-03-01",
-            end_date: "2025-07-30",
-            budget_total: 2800000,
-            location_primary: "Various",
-            created_at: "2025-02-20T09:15:00Z"
-          }
-        ]);
-      }
+      const projectsData = await projectService.getProjects();
+      setProjects(projectsData);
+      
+      console.log('✅ Projects loaded:', projectsData);
+      
     } catch (error) {
-      console.error('Error fetching projects:', error);
+      console.error('❌ Failed to load projects:', error);
+      setError('Nepodařilo se načíst projekty');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSaveProject = async (formData: any) => {
-    try {
-      const url = editingProject 
-        ? `${import.meta.env.VITE_API_URL}/production/${editingProject.id}/`
-        : `${import.meta.env.VITE_API_URL}/production/`;
-      
-      const method = editingProject ? 'PATCH' : 'POST';
-      
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('access_token')}`,
-        },
-        body: JSON.stringify({
-          ...formData,
-          budget_total: Number(formData.budget_total)
-        }),
-      });
-
-      if (response.ok) {
-        await fetchProjects(); // Refresh the list
-        setIsModalOpen(false);
-        setEditingProject(null);
-      } else {
-        console.error('Failed to save project');
-        throw new Error('Failed to save project');
-      }
-    } catch (error) {
-      console.error('Error saving project:', error);
-      throw error;
-    }
-  };
-
-  const handleEditProject = (project: FilmProject) => {
-    setEditingProject(project);
-    setIsModalOpen(true);
-  };
-
-  const handleAddProject = () => {
-    setEditingProject(null);
-    setIsModalOpen(true);
-  };
-
-  const handleViewProject = (projectId: number) => {
-    navigate(`/films/${projectId}`);
-  };
-
-  const filteredProjects = projects.filter(project =>
-    project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    project.description.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const formatCurrency = (amount: number) => {
+  const formatBudget = (budget: number) => {
     return new Intl.NumberFormat('cs-CZ', {
       style: 'currency',
-      currency: 'USD',
-      notation: 'compact',
-      maximumFractionDigits: 1,
-    }).format(amount);
+      currency: 'CZK',
+      minimumFractionDigits: 0,
+    }).format(budget);
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('cs-CZ', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    return new Date(dateString).toLocaleDateString('cs-CZ');
   };
 
   const getStatusLabel = (status: string) => {
-    const labels = {
+    const labels: Record<string, string> = {
       development: 'Vývoj',
       pre_production: 'Příprava',
       production: 'Natáčení',
@@ -417,117 +189,127 @@ const Films: React.FC = () => {
       completed: 'Dokončeno',
       cancelled: 'Zrušeno'
     };
-    return labels[status as keyof typeof labels] || status;
+    return labels[status] || status;
   };
 
   if (isLoading) {
     return (
-      <FilmsContainer>
-        <LoadingState>
-          <Film size={24} style={{ marginRight: '0.5rem' }} />
-          Načítání projektů...
-        </LoadingState>
-      </FilmsContainer>
+      <PageContainer>
+        <LoadingContainer>
+          🎬 Načítání projektů...
+        </LoadingContainer>
+      </PageContainer>
+    );
+  }
+
+  if (error) {
+    return (
+      <PageContainer>
+        <PageHeader>Filmy & Produkce</PageHeader>
+        <ErrorContainer
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          {error}
+          <br />
+          <Button onClick={loadProjects} style={{ marginTop: '1rem' }}>
+            Zkusit znovu
+          </Button>
+        </ErrorContainer>
+      </PageContainer>
     );
   }
 
   return (
-    <FilmsContainer>
-      <PageHeader>
-        <Title>
-          <Film size={40} />
-          Filmové projekty
-        </Title>
-        <AddButton onClick={handleAddProject}>
-          <Plus size={16} />
-          Nový projekt
-        </AddButton>
-      </PageHeader>
+    <PageContainer>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+      >
+        <PageHeader>Filmy & Produkce</PageHeader>
+        <PageSubtitle>Správa filmových projektů a produkcí</PageSubtitle>
+        
+        <ControlsRow>
+          <div>
+            <Button 
+              variant="primary" 
+              icon={<Plus size={16} />}
+              onClick={() => alert('Přidat projekt - Coming soon')}
+            >
+              Nový projekt
+            </Button>
+          </div>
+        </ControlsRow>
 
-      <SearchSection>
-        <Search size={20} />
-        <SearchInput
-          type="text"
-          placeholder="Vyhledat projekty..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </SearchSection>
-
-      {filteredProjects.length === 0 ? (
-        <EmptyState>
-          <Film size={48} style={{ margin: '0 auto 1rem', opacity: 0.5 }} />
-          <h3>Žádné projekty nenalezeny</h3>
-          <p>Začněte vytvořením vašeho prvního filmového projektu.</p>
-        </EmptyState>
-      ) : (
-        <ProjectGrid>
-          {filteredProjects.map((project) => (
-            <ProjectCard key={project.id}>
-              <ProjectHeader>
-                <div>
-                  <ProjectTitle>{project.title}</ProjectTitle>
-                  <StatusBadge $status={project.status}>
-                    {getStatusLabel(project.status)}
-                  </StatusBadge>
-                </div>
-              </ProjectHeader>
-
-              <ProjectDescription>
-                {project.description}
-              </ProjectDescription>
-
-              <ProjectMeta>
-                <MetaItem>
-                  <MetaLabel>Rozpočet</MetaLabel>
-                  <MetaValue>{formatCurrency(project.budget_total)}</MetaValue>
-                </MetaItem>
-                <MetaItem>
-                  <MetaLabel>Lokace</MetaLabel>
-                  <MetaValue>{project.location_primary}</MetaValue>
-                </MetaItem>
-                <MetaItem>
-                  <MetaLabel>Začátek</MetaLabel>
-                  <MetaValue>{formatDate(project.start_date)}</MetaValue>
-                </MetaItem>
-                <MetaItem>
-                  <MetaLabel>Konec</MetaLabel>
-                  <MetaValue>{formatDate(project.end_date)}</MetaValue>
-                </MetaItem>
-              </ProjectMeta>
-
-              <ProjectActions>
-                <ActionButton onClick={(e) => {
-                  e.stopPropagation();
-                  handleViewProject(project.id);
-                }}>
-                  <Eye size={16} />
-                  Detail
-                </ActionButton>
-                <ActionButton onClick={(e) => {
-                  e.stopPropagation();
-                  handleEditProject(project);
-                }}>
-                  <Edit size={16} />
-                  Upravit
-                </ActionButton>
-              </ProjectActions>
-            </ProjectCard>
-          ))}
-        </ProjectGrid>
-      )}
-
-      <ProjectEditModal
-        isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false);
-          setEditingProject(null);
-        }}
-        onSave={handleSaveProject}
-        project={editingProject}
-        isEditing={!!editingProject}
-      />
-    </FilmsContainer>
+        {projects.length === 0 ? (
+          <EmptyState>
+            <div className="icon">🎬</div>
+            <h3>Žádné projekty</h3>
+            <p>Začněte vytvořením nového filmového projektu</p>
+          </EmptyState>
+        ) : (
+          <ProjectsGrid>
+            <AnimatePresence>
+              {projects.map((project, index) => (
+                <ContentCard
+                  key={project.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.1 }}
+                  onClick={() => navigate(`/films/${project.id}`)}
+                >
+                  <ContentCardHeader>
+                    <ContentCardTitle>{project.title}</ContentCardTitle>
+                    <StatusBadge $status={project.status}>
+                      {getStatusLabel(project.status)}
+                    </StatusBadge>
+                  </ContentCardHeader>
+                  
+                  {project.description && (
+                    <ProjectDescription>
+                      {project.description}
+                    </ProjectDescription>
+                  )}
+                  
+                  <ProjectMetrics>
+                    <MetricItem>
+                      <MetricIcon><DollarSign size={16} /></MetricIcon>
+                      <MetricText>{formatBudget(project.budget)}</MetricText>
+                    </MetricItem>
+                    <MetricItem>
+                      <MetricIcon><Calendar size={16} /></MetricIcon>
+                      <MetricText>{formatDate(project.start_date)}</MetricText>
+                    </MetricItem>
+                  </ProjectMetrics>
+                  
+                  <ContentCardFooter>
+                    <ProjectMeta>
+                      <MetaLabel>Lokace</MetaLabel>
+                      <MetaValue>
+                        <MapPin size={14} style={{ display: 'inline', marginRight: '0.25rem' }} />
+                        {project.location_primary}
+                      </MetaValue>
+                    </ProjectMeta>
+                    
+                    <PlayButton
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/films/${project.id}`);
+                      }}
+                    >
+                      <Play size={20} fill="currentColor" />
+                    </PlayButton>
+                  </ContentCardFooter>
+                </ContentCard>
+              ))}
+            </AnimatePresence>
+          </ProjectsGrid>
+        )}
+      </motion.div>
+    </PageContainer>
   );
 };
 

@@ -1,5 +1,8 @@
-// src/types/project.ts - Project type definitions
-export interface Project {
+// src/types/project.ts - Legacy project types (deprecated - use types/index.ts)
+// This file is kept for backward compatibility only
+// All new types should go to types/index.ts
+
+export interface LegacyProject {
   id: string;
   title: string;
   description: string;
@@ -119,52 +122,4 @@ export interface Contact {
   email?: string;
   phone?: string;
   role?: string;
-}
-
-// Form types
-export interface CreateProjectRequest {
-  title: string;
-  description: string;
-  type: Project['type'];
-  genre: string[];
-  director: string;
-  producer: string;
-  writer?: string;
-  budget: {
-    total: number;
-    currency: string;
-  };
-  timeline: {
-    startDate: string;
-    endDate: string;
-  };
-  priority: Project['priority'];
-  visibility: Project['visibility'];
-  tags: string[];
-  notes?: string;
-}
-
-export interface UpdateProjectRequest extends Partial<CreateProjectRequest> {
-  id: string;
-}
-
-// API response types
-export interface ProjectsResponse {
-  results: Project[];
-  count: number;
-  next: string | null;
-  previous: string | null;
-}
-
-export interface ProjectFilters {
-  status?: Project['status'];
-  type?: Project['type'];
-  priority?: Project['priority'];
-  search?: string;
-  director?: string;
-  producer?: string;
-  tags?: string[];
-  page?: number;
-  pageSize?: number;
-  ordering?: string;
 }

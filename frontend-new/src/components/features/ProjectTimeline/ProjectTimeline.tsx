@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import styled from 'styled-components';
-import { Card, GlassCard, CardHeader, CardContent } from '../../ui/Card';
-import { PrimaryButton, SecondaryButton, OutlineButton } from '../../ui/Button';
+import { Card } from '../../ui/Card';
+import { Button } from '../../ui/Button';
 import { TimelineView } from './TimelineView';
 import { MilestoneManager } from './MilestoneManager';
 import { TaskManager } from './TaskManager';
@@ -54,27 +54,111 @@ interface ProjectTimelineProps {
   onAddMilestone?: (milestone: Omit<TimelineMilestone, 'id'>) => void;
 }
 
-type ViewMode = 'gantt' | 'calendar' | 'list' | 'milestones' | 'critical_path';
-type TimeScale = 'days' | 'weeks' | 'months';
+const TimelineContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  height: 100%;
+`;
 
-export function ProjectTimeline({ 
-  projectId, 
-  timeline, 
+const TimelineHeader = styled(Card)`
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+`;
+
+const HeaderContent = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+`;
+
+const TimelineTitle = styled.h2`
+  margin: 0;
+  color: #fff;
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+`;
+
+const TimelineStats = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+`;
+
+const StatItem = styled.div`
+  text-align: center;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+`;
+
+const StatNumber = styled.div`
+  color: #667eea;
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+`;
+
+const StatLabel = styled.div`
+  color: #8b8b8b;
+  font-size: 0.75rem;
+`;
+
+const TimelineContent = styled.div`
+  flex: 1;
+  min-height: 400px;
+`;
+
+const CalendarView = styled(Card)`
+  padding: 2rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  text-align: center;
+`;
+
+const CalendarPlaceholder = styled.div`
+  padding: 3rem;
+  color: #8b8b8b;
+`;
+
+const CalendarIcon = styled.div`
+  font-size: 3rem;
+  margin-bottom: 1rem;
+`;
+
+const CalendarMessage = styled.div`
+  font-size: 1rem;
+`;
+
+export const ProjectTimeline: React.FC<ProjectTimelineProps> = ({
+  projectId,
+  timeline,
   onTaskUpdate,
   onMilestoneUpdate,
   onAddTask,
   onAddMilestone
-}: ProjectTimelineProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>('gantt');
-  const [timeScale, setTimeScale] = useState<TimeScale>('weeks');
-  const [selectedTask, setSelectedTask] = useState<string | null>(null);
-  const [selectedMilestone, setSelectedMilestone] = useState<string | null>(null);
+}) => {
+  // UI state
+  const [viewMode, setViewMode] = useState<'gantt' | 'list' | 'calendar' | 'milestones'>('gantt');
+  const [timeScale, setTimeScale] = useState<'days' | 'weeks' | 'months'>('weeks');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [showDependencies, setShowDependencies] = useState(true);
+  const [selectedTask, setSelectedTask] = useState<string | null>(null);
+  const [selectedMilestone, setSelectedMilestone] = useState<string | null>(null);
 
-  // Výpočet timeline analytics
-  const timelineAnalytics = useMemo(() => {
+  // Výpočet statistik
+  const timelineStats = useMemo(() => {
     const tasks = timeline.tasks;
     const totalTasks = tasks.length;
     const completedTasks = tasks.filter(t => t.status === 'completed').length;
@@ -112,6 +196,24 @@ export function ProjectTimeline({
     };
   }, [timeline.tasks, timeline.milestones, timeline.startDate, timeline.endDate, timeline.currentPhase]);
 
+  // Helper functions
+  const calculateCriticalPath = (tasks: TimelineTask[]): number => {
+    // Simplified critical path calculation
+    return tasks.filter(t => t.priority === 'critical').length;
+  };
+
+  const calculateProjectDuration = (startDate: string, endDate: string): number => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
+  const calculatePhaseProgress = (tasks: TimelineTask[], currentPhase: string): number => {
+    const phaseTasks = tasks.filter(t => t.category === currentPhase);
+    if (phaseTasks.length === 0) return 0;
+    return phaseTasks.reduce((sum, task) => sum + task.progress, 0) / phaseTasks.length;
+  };
+
   // Filtrování tasků
   const filteredTasks = useMemo(() => {
     return timeline.tasks.filter(task => {
@@ -131,47 +233,89 @@ export function ProjectTimeline({
     setSelectedTask(null);
   };
 
-  const getStatusColor = (status: string) => {
+  const getStatusColor = (status: string): string => {
     const colors = {
-      not_started: '#6B7280',
-      in_progress: '#3B82F6',
-      completed: '#10B981',
-      delayed: '#F59E0B',
-      blocked: '#EF4444'
+      'completed': '#22c55e',
+      'in_progress': '#3b82f6',
+      'delayed': '#f59e0b',
+      'blocked': '#ef4444',
+      'not_started': '#6b7280'
     };
-    return colors[status as keyof typeof colors] || '#6B7280';
+    return colors[status as keyof typeof colors] || '#6b7280';
   };
 
-  const getPriorityColor = (priority: string) => {
+  const getPriorityColor = (priority: string): string => {
     const colors = {
-      low: '#10B981',
-      medium: '#F59E0B',
-      high: '#EF4444',
-      critical: '#DC2626'
+      'critical': '#ef4444',
+      'high': '#f59e0b',
+      'medium': '#3b82f6',
+      'low': '#6b7280'
     };
-    return colors[priority as keyof typeof colors] || '#6B7280';
+    return colors[priority as keyof typeof colors] || '#6b7280';
+  };
+
+  const handleToggleDependencies = () => {
+    setShowDependencies(!showDependencies);
   };
 
   return (
     <TimelineContainer>
+      {/* Timeline Header */}
+      <TimelineHeader>
+        <HeaderContent>
+          <TimelineTitle>
+            📊 Timeline projektu
+          </TimelineTitle>
+          <div style={{ color: '#8b8b8b', fontSize: '0.875rem' }}>
+            Poslední aktualizace: {new Date(timeline.lastUpdated).toLocaleDateString('cs-CZ')}
+          </div>
+        </HeaderContent>
+
+        <TimelineStats>
+          <StatItem>
+            <StatNumber>{timelineStats.totalTasks}</StatNumber>
+            <StatLabel>Celkem úkolů</StatLabel>
+          </StatItem>
+          <StatItem>
+            <StatNumber>{timelineStats.completedTasks}</StatNumber>
+            <StatLabel>Dokončeno</StatLabel>
+          </StatItem>
+          <StatItem>
+            <StatNumber>{timelineStats.inProgressTasks}</StatNumber>
+            <StatLabel>Probíhá</StatLabel>
+          </StatItem>
+          <StatItem>
+            <StatNumber>{Math.round(timelineStats.overallProgress)}%</StatNumber>
+            <StatLabel>Celkový progress</StatLabel>
+          </StatItem>
+          <StatItem>
+            <StatNumber>{timelineStats.upcomingMilestones}</StatNumber>
+            <StatLabel>Nadcházející milníky</StatLabel>
+          </StatItem>
+          <StatItem>
+            <StatNumber>{timelineStats.criticalTasks}</StatNumber>
+            <StatLabel>Kritické úkoly</StatLabel>
+          </StatItem>
+        </TimelineStats>
+      </TimelineHeader>
+
       {/* Timeline Controls */}
-      <TimelineControls 
+      <TimelineControls
         viewMode={viewMode}
-        onViewModeChange={setViewMode}
         timeScale={timeScale}
-        onTimeScaleChange={setTimeScale}
         filterCategory={filterCategory}
-        onFilterCategoryChange={setFilterCategory}
         filterStatus={filterStatus}
-        onFilterStatusChange={setFilterStatus}
         showDependencies={showDependencies}
-        onToggleDependencies={setShowDependencies}
-        analytics={timelineAnalytics}
-        onAddTask={() => onAddTask && onAddTask({
+        onViewModeChange={setViewMode}
+        onTimeScaleChange={setTimeScale}
+        onFilterCategoryChange={setFilterCategory}
+        onFilterStatusChange={setFilterStatus}
+        onToggleDependencies={handleToggleDependencies}
+        onAddTask={onAddTask ? () => onAddTask({
           title: 'Nový úkol',
-          startDate: new Date().toISOString(),
-          endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-          duration: 7,
+          startDate: new Date().toISOString().split('T')[0],
+          endDate: new Date().toISOString().split('T')[0],
+          duration: 1,
           progress: 0,
           status: 'not_started',
           priority: 'medium',
@@ -179,15 +323,15 @@ export function ProjectTimeline({
           category: timeline.currentPhase,
           resources: [],
           tags: []
-        })}
-        onAddMilestone={() => onAddMilestone && onAddMilestone({
-          title: 'Nový milestone',
-          date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+        }) : undefined}
+        onAddMilestone={onAddMilestone ? () => onAddMilestone({
+          title: 'Nový milník',
+          date: new Date().toISOString().split('T')[0],
           type: 'deadline',
           status: 'upcoming',
           importance: 'medium',
           relatedTasks: []
-        })}
+        }) : undefined}
       />
 
       {/* Main Timeline Content */}
@@ -234,133 +378,17 @@ export function ProjectTimeline({
 
         {viewMode === 'calendar' && (
           <CalendarView>
-            <GlassCard>
-              <CardHeader>
-                <h3>Kalendářní pohled</h3>
-              </CardHeader>
-              <CardContent>
-                <CalendarPlaceholder>
-                  <CalendarIcon>📅</CalendarIcon>
-                  <CalendarMessage>
-                    Kalendářní pohled bude implementován v další iteraci
-                  </CalendarMessage>
-                  <CalendarSubMessage>
-                    Bude obsahovat měsíční/týdenní view s events a deadlines
-                  </CalendarSubMessage>
-                </CalendarPlaceholder>
-              </CardContent>
-            </GlassCard>
+            <CalendarPlaceholder>
+              <CalendarIcon>📅</CalendarIcon>
+              <CalendarMessage>
+                Kalendářní pohled bude implementován v příští verzi
+              </CalendarMessage>
+            </CalendarPlaceholder>
           </CalendarView>
-        )}
-
-        {viewMode === 'critical_path' && (
-          <CriticalPathView>
-            <GlassCard>
-              <CardHeader>
-                <h3>Critical Path Analysis</h3>
-              </CardHeader>
-              <CardContent>
-                <CriticalPathPlaceholder>
-                  <CriticalPathIcon>🎯</CriticalPathIcon>
-                  <CriticalPathMessage>
-                    Critical Path analýza bude implementována v další iteraci
-                  </CriticalPathMessage>
-                  <CriticalPathSubMessage>
-                    Bude identifikovat nejdůležitější sekvence úkolů
-                  </CriticalPathSubMessage>
-                </CriticalPathPlaceholder>
-              </CardContent>
-            </GlassCard>
-          </CriticalPathView>
         )}
       </TimelineContent>
     </TimelineContainer>
   );
-}
+};
 
-// Helper functions
-function calculateCriticalPath(tasks: TimelineTask[]): string[] {
-  // Simplified critical path calculation
-  // V reálné aplikaci by použil komplexní algoritmus
-  return tasks
-    .filter(t => t.priority === 'critical' || t.dependencies.length === 0)
-    .map(t => t.id);
-}
-
-function calculateProjectDuration(startDate: string, endDate: string): number {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-}
-
-function calculatePhaseProgress(tasks: TimelineTask[], currentPhase: string): number {
-  const phaseTasks = tasks.filter(t => t.category === currentPhase);
-  if (phaseTasks.length === 0) return 0;
-  
-  return phaseTasks.reduce((sum, task) => sum + task.progress, 0) / phaseTasks.length;
-}
-
-// Styled Components
-const TimelineContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${props => props.theme.spacing.xl};
-  height: 100%;
-`;
-
-const TimelineContent = styled.div`
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-`;
-
-const CalendarView = styled.div``;
-const CriticalPathView = styled.div``;
-
-const CalendarPlaceholder = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: ${props => props.theme.spacing['4xl']};
-  text-align: center;
-`;
-
-const CalendarIcon = styled.div`
-  font-size: ${props => props.theme.typography.fontSize['4xl']};
-  margin-bottom: ${props => props.theme.spacing.lg};
-`;
-
-const CalendarMessage = styled.h3`
-  margin: 0 0 ${props => props.theme.spacing.sm} 0;
-  color: ${props => props.theme.colors.text};
-`;
-
-const CalendarSubMessage = styled.p`
-  margin: 0;
-  color: ${props => props.theme.colors.textSecondary};
-`;
-
-const CriticalPathPlaceholder = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: ${props => props.theme.spacing['4xl']};
-  text-align: center;
-`;
-
-const CriticalPathIcon = styled.div`
-  font-size: ${props => props.theme.typography.fontSize['4xl']};
-  margin-bottom: ${props => props.theme.spacing.lg};
-`;
-
-const CriticalPathMessage = styled.h3`
-  margin: 0 0 ${props => props.theme.spacing.sm} 0;
-  color: ${props => props.theme.colors.text};
-`;
-
-const CriticalPathSubMessage = styled.p`
-  margin: 0;
-  color: ${props => props.theme.colors.textSecondary};
-`;
+export default ProjectTimeline;

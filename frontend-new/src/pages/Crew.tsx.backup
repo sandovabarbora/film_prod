@@ -1,0 +1,918 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import styled from 'styled-components';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  Plus, 
+  Search, 
+  Filter, 
+  ArrowLeft, 
+  Users, 
+  Building2, 
+  Briefcase,
+  Edit3,
+  Trash2,
+  Mail,
+  Phone,
+  Star,
+  TrendingUp,
+  Share,
+  Download
+} from 'lucide-react';
+
+import { Button } from '../components/ui/Button';
+import { useProject } from '../contexts/ProjectContext';
+import { CrewAssignButton } from '../components/crew/CrewAssignButton';
+import { CrewEditModal } from '../components/crew/CrewEditModal';
+import { CrewDeleteModal } from '../components/crew/CrewDeleteModal';
+import crewService from '../services/crewService';
+import type { CrewMember, CrewDepartment, CrewPosition, CrewMemberData } from '../types';
+
+// 🎬 Dashboard-style containers (EXACT kopie)
+const PageContainer = styled.div`
+  padding: ${({ theme }) => theme.spacing[8]};
+  max-width: 1400px;
+  margin: 0 auto;
+`;
+
+const Header = styled.h1`
+  font-family: ${({ theme }) => theme.typography.fontFamily.mono};
+  font-size: ${({ theme }) => theme.typography.fontSize['4xl']};
+  font-weight: ${({ theme }) => theme.typography.fontWeight.bold};
+  color: ${({ theme }) => theme.colors.text.primary};
+  margin-bottom: ${({ theme }) => theme.spacing[2]};
+  text-transform: uppercase;
+  letter-spacing: 1px;
+`;
+
+const Subtitle = styled.p`
+  font-family: ${({ theme }) => theme.typography.fontFamily.mono};
+  font-size: ${({ theme }) => theme.typography.fontSize.sm};
+  color: ${({ theme }) => theme.colors.text.secondary};
+  margin-bottom: ${({ theme }) => theme.spacing[8]};
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+`;
+
+const BackButton = styled(Button)`
+  margin-bottom: ${({ theme }) => theme.spacing[6]};
+`;
+
+const ControlsRow = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: ${({ theme }) => theme.spacing[8]};
+  flex-wrap: wrap;
+  gap: ${({ theme }) => theme.spacing[4]};
+`;
+
+const SearchContainer = styled.div`
+  position: relative;
+  flex: 1;
+  max-width: 400px;
+`;
+
+const SearchInput = styled.input`
+  width: 100%;
+  padding: ${({ theme }) => theme.spacing[3]} ${({ theme }) => theme.spacing[4]};
+  padding-left: ${({ theme }) => theme.spacing[10]};
+  background: ${({ theme }) => theme.colors.glass.surface};
+  backdrop-filter: ${({ theme }) => theme.cinema.backdrop.light};
+  border: 1px solid ${({ theme }) => theme.colors.glass.border};
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  color: ${({ theme }) => theme.colors.text.primary};
+  font-family: ${({ theme }) => theme.typography.fontFamily.mono};
+  font-size: ${({ theme }) => theme.typography.fontSize.sm};
+  transition: ${({ theme }) => theme.transitions.cinema};
+  
+  &::placeholder {
+    color: ${({ theme }) => theme.colors.text.muted};
+  }
+  
+  &:focus {
+    outline: none;
+    border-color: ${({ theme }) => theme.colors.text.accent};
+    background: ${({ theme }) => theme.colors.glass.surfaceHover};
+  }
+`;
+
+const SearchIcon = styled(Search)`
+  position: absolute;
+  left: ${({ theme }) => theme.spacing[3]};
+  top: 50%;
+  transform: translateY(-50%);
+  color: ${({ theme }) => theme.colors.text.muted};
+  width: 16px;
+  height: 16px;
+`;
+
+// 📊 Dashboard MetricCard (EXACT kopie)
+const MetricsGrid = styled.section`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: ${({ theme }) => theme.spacing[4]};
+  margin-bottom: ${({ theme }) => theme.spacing[8]};
+`;
+
+const MetricCard = styled(motion.div)<{ $accent?: string }>`
+  background: ${({ theme }) => theme.colors.glass.surface};
+  backdrop-filter: ${({ theme }) => theme.cinema.backdrop.light};
+  border: 1px solid ${({ theme }) => theme.colors.glass.border};
+  border-radius: ${({ theme }) => theme.borderRadius['2xl']};
+  padding: ${({ theme }) => theme.spacing[6]};
+  position: relative;
+  overflow: hidden;
+  transition: ${({ theme }) => theme.transitions.cinema};
+  
+  &:hover {
+    background: ${({ theme }) => theme.colors.glass.surfaceHover};
+    border-color: ${({ theme }) => theme.colors.text.accent};
+    transform: translateY(-4px);
+    box-shadow: ${({ theme }) => theme.shadows.cinema};
+  }
+  
+  /* JetBrains-style accent indicator */
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: ${({ $accent, theme }) => $accent || theme.colors.text.accent};
+  }
+`;
+
+const MetricHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: ${({ theme }) => theme.spacing[4]};
+`;
+
+const MetricIcon = styled.div`
+  width: 48px;
+  height: 48px;
+  border-radius: ${({ theme }) => theme.borderRadius.xl};
+  background: ${({ theme }) => theme.colors.text.accent}15;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: ${({ theme }) => theme.colors.text.accent};
+`;
+
+const MetricValue = styled.div`
+  font-family: ${({ theme }) => theme.typography.fontFamily.mono};
+  font-size: ${({ theme }) => theme.typography.fontSize['3xl']};
+  font-weight: ${({ theme }) => theme.typography.fontWeight.bold};
+  color: ${({ theme }) => theme.colors.text.primary};
+  margin-bottom: ${({ theme }) => theme.spacing[1]};
+`;
+
+const MetricLabel = styled.div`
+  font-family: ${({ theme }) => theme.typography.fontFamily.mono};
+  font-size: ${({ theme }) => theme.typography.fontSize.sm};
+  color: ${({ theme }) => theme.colors.text.secondary};
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.spacing[2]};
+`;
+
+// 🃏 Dashboard ProjectCard style pro crew members
+const CrewGrid = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing[3]};
+`;
+
+const CrewCard = styled(motion.div)`
+  background: ${({ theme }) => theme.colors.glass.surface};
+  border: 1px solid ${({ theme }) => theme.colors.glass.border};
+  border-radius: ${({ theme }) => theme.borderRadius.xl};
+  padding: ${({ theme }) => theme.spacing[4]};
+  transition: ${({ theme }) => theme.transitions.cinema};
+  cursor: pointer;
+  position: relative;
+  
+  &:hover {
+    background: ${({ theme }) => theme.colors.glass.surfaceHover};
+    border-color: ${({ theme }) => theme.colors.text.accent};
+    transform: translateX(4px);
+  }
+  
+  /* JetBrains-style hover accent */
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 0;
+    background: ${({ theme }) => theme.colors.text.accent};
+    transition: width 0.3s ease;
+  }
+  
+  &:hover::before {
+    width: 3px;
+  }
+`;
+
+const CrewHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: ${({ theme }) => theme.spacing[3]};
+`;
+
+const CrewInfo = styled.div`
+  flex: 1;
+`;
+
+const CrewName = styled.h3`
+  font-family: ${({ theme }) => theme.typography.fontFamily.mono};
+  font-size: ${({ theme }) => theme.typography.fontSize.lg};
+  font-weight: ${({ theme }) => theme.typography.fontWeight.medium};
+  color: ${({ theme }) => theme.colors.text.primary};
+  margin: 0 0 ${({ theme }) => theme.spacing[1]} 0;
+`;
+
+const CrewPosition = styled.p`
+  font-family: ${({ theme }) => theme.typography.fontFamily.mono};
+  font-size: ${({ theme }) => theme.typography.fontSize.sm};
+  color: ${({ theme }) => theme.colors.text.accent};
+  margin: 0 0 ${({ theme }) => theme.spacing[2]} 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+`;
+
+const CrewMeta = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing[1]};
+`;
+
+const MetaLabel = styled.span`
+  font-family: ${({ theme }) => theme.typography.fontFamily.mono};
+  font-size: ${({ theme }) => theme.typography.fontSize.xs};
+  color: ${({ theme }) => theme.colors.text.muted};
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+`;
+
+const MetaValue = styled.span`
+  font-family: ${({ theme }) => theme.typography.fontFamily.mono};
+  font-size: ${({ theme }) => theme.typography.fontSize.sm};
+  font-weight: ${({ theme }) => theme.typography.fontWeight.medium};
+  color: ${({ theme }) => theme.colors.text.primary};
+`;
+
+const CrewActions = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.spacing[2]};
+  margin-top: ${({ theme }) => theme.spacing[3]};
+  padding-top: ${({ theme }) => theme.spacing[3]};
+  border-top: 1px solid ${({ theme }) => theme.colors.glass.border};
+`;
+
+const DepartmentBadge = styled.span<{ $color?: string }>`
+  padding: ${({ theme }) => theme.spacing[1]} ${({ theme }) => theme.spacing[2]};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  font-family: ${({ theme }) => theme.typography.fontFamily.mono};
+  font-size: ${({ theme }) => theme.typography.fontSize.xs};
+  font-weight: ${({ theme }) => theme.typography.fontWeight.medium};
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: ${({ $color }) => $color ? `${$color}15` : 'rgba(107, 114, 128, 0.15)'};
+  color: ${({ $color }) => $color || '#9ca3af'};
+  border: 1px solid ${({ $color }) => $color ? `${$color}30` : 'rgba(107, 114, 128, 0.3)'};
+`;
+
+const LoadingContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 50vh;
+  color: ${({ theme }) => theme.colors.text.muted};
+  font-family: ${({ theme }) => theme.typography.fontFamily.mono};
+  gap: ${({ theme }) => theme.spacing[4]};
+`;
+
+const LoadingSpinner = styled(motion.div)`
+  width: 40px;
+  height: 40px;
+  border: 3px solid ${({ theme }) => theme.colors.glass.border};
+  border-top: 3px solid ${({ theme }) => theme.colors.text.accent};
+  border-radius: 50%;
+`;
+
+const EmptyState = styled.div`
+  text-align: center;
+  color: ${({ theme }) => theme.colors.text.muted};
+  padding: ${({ theme }) => theme.spacing[12]};
+  background: ${({ theme }) => theme.colors.glass.surface};
+  backdrop-filter: ${({ theme }) => theme.cinema.backdrop.light};
+  border: 1px dashed ${({ theme }) => theme.colors.glass.border};
+  border-radius: ${({ theme }) => theme.borderRadius['2xl']};
+  
+  .icon {
+    font-size: 4rem;
+    margin-bottom: ${({ theme }) => theme.spacing[4]};
+    opacity: 0.7;
+  }
+  
+  h3 {
+    font-family: ${({ theme }) => theme.typography.fontFamily.mono};
+    color: ${({ theme }) => theme.colors.text.primary};
+    margin-bottom: ${({ theme }) => theme.spacing[2]};
+    text-transform: uppercase;
+  }
+  
+  p {
+    font-family: ${({ theme }) => theme.typography.fontFamily.mono};
+    font-size: ${({ theme }) => theme.typography.fontSize.sm};
+  }
+`;
+
+const ErrorContainer = styled(motion.div)`
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid #ef4444;
+  border-radius: ${({ theme }) => theme.borderRadius['2xl']};
+  padding: ${({ theme }) => theme.spacing[6]};
+  margin-top: ${({ theme }) => theme.spacing[8]};
+  color: #ef4444;
+  text-align: center;
+  backdrop-filter: ${({ theme }) => theme.cinema.backdrop.light};
+  font-family: ${({ theme }) => theme.typography.fontFamily.mono};
+`;
+
+const ProjectBanner = styled(motion.div)`
+  background: ${({ theme }) => theme.colors.glass.surface};
+  backdrop-filter: ${({ theme }) => theme.cinema.backdrop.light};
+  border: 1px solid ${({ theme }) => theme.colors.glass.border};
+  border-radius: ${({ theme }) => theme.borderRadius['2xl']};
+  padding: ${({ theme }) => theme.spacing[6]};
+  margin-bottom: ${({ theme }) => theme.spacing[8]};
+`;
+
+const ProjectTitle = styled.h2`
+  font-family: ${({ theme }) => theme.typography.fontFamily.mono};
+  font-size: ${({ theme }) => theme.typography.fontSize.xl};
+  font-weight: ${({ theme }) => theme.typography.fontWeight.bold};
+  color: ${({ theme }) => theme.colors.text.primary};
+  margin: 0 0 ${({ theme }) => theme.spacing[1]} 0;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+`;
+
+const ProjectMeta = styled.p`
+  font-family: ${({ theme }) => theme.typography.fontFamily.mono};
+  color: ${({ theme }) => theme.colors.text.secondary};
+  margin: 0;
+  font-size: ${({ theme }) => theme.typography.fontSize.sm};
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+`;
+
+const Crew: React.FC = () => {
+  const navigate = useNavigate();
+  const { id: projectId } = useParams();
+  const { project, isLoading: projectLoading } = useProject(false);
+  
+  const [crew, setCrew] = useState<CrewMember[]>([]);
+  const [departments, setDepartments] = useState<CrewDepartment[]>([]);
+  const [positions, setPositions] = useState<CrewPosition[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [assignments, setAssignments] = useState<Set<string>>(new Set());
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  // Modal states
+  const [editModal, setEditModal] = useState<{
+    isOpen: boolean;
+    crewMember: CrewMember | null;
+  }>({ isOpen: false, crewMember: null });
+  
+  const [deleteModal, setDeleteModal] = useState<{
+    isOpen: boolean;
+    crewMember: CrewMember | null;
+  }>({ isOpen: false, crewMember: null });
+
+  const isProjectSpecific = Boolean(projectId);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  useEffect(() => {
+    if (project) {
+      loadAssignments();
+    }
+  }, [project]);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('🔄 Loading crew data...');
+      
+      const [crewData, departmentsData, positionsData] = await Promise.all([
+        crewService.getCrewMembers(),
+        crewService.getDepartments(),
+        crewService.getPositions()
+      ]);
+      
+      setCrew(crewData);
+      setDepartments(departmentsData);
+      setPositions(positionsData);
+      
+      console.log('📊 Data loaded:', {
+        crew: crewData.length,
+        departments: departmentsData.length,
+        positions: positionsData.length
+      });
+      
+      if (crewData.length > 0) {
+        console.log('🔍 Sample crew member:', crewData[0]);
+        const missingFields = crewData.filter(member => 
+          !member.first_name || !member.last_name || !member.email
+        );
+        if (missingFields.length > 0) {
+          console.warn('⚠️ Crew members with missing required fields:', missingFields);
+        }
+      }
+      
+    } catch (error) {
+      console.error('❌ Failed to load crew data:', error);
+      setError('Nepodařilo se načíst data štábu');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadAssignments = async () => {
+    if (!project?.id) return;
+    
+    try {
+      console.log('📋 Loading assignments for project:', project.id);
+      const assignedMembers = await crewService.getProjectAssignments(project.id);
+      setAssignments(new Set(assignedMembers.map(member => member.id.toString())));
+    } catch (error) {
+      console.error('❌ Failed to load assignments:', error);
+    }
+  };
+
+  const handleAssignCrew = async (crewMember: CrewMember) => {
+    if (!project?.id) return;
+    
+    try {
+      await crewService.assignCrewToProduction([crewMember.id.toString()], project.id, {
+        role: crewMember.primary_position?.title || 'General',
+        start_date: new Date().toISOString().split('T')[0],
+        daily_rate: 0
+      });
+      
+      setAssignments(prev => new Set([...prev, crewMember.id.toString()]));
+      console.log('✅ Crew member assigned:', crewMember.first_name, crewMember.last_name);
+      
+    } catch (error) {
+      console.error('❌ Failed to assign crew member:', error);
+      throw error;
+    }
+  };
+
+  const handleUnassignCrew = async (crewMember: CrewMember) => {
+    if (!project?.id) return;
+    
+    try {
+      await crewService.unassignCrewFromProduction(crewMember.id.toString(), project.id);
+      setAssignments(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(crewMember.id.toString());
+        return newSet;
+      });
+      
+      console.log('✅ Crew member unassigned:', crewMember.first_name, crewMember.last_name);
+      
+    } catch (error) {
+      console.error('❌ Failed to unassign crew member:', error);
+      throw error;
+    }
+  };
+
+  const getCrewStats = () => {
+    const totalCrew = crew.length;
+    const activeCrew = crew.filter(member => member.is_active).length;
+    const assignedCrew = assignments.size;
+    const totalDepartments = departments.length;
+    
+    return { totalCrew, activeCrew, assignedCrew, totalDepartments };
+  };
+
+  const filteredCrew = crew.filter(member => {
+    if (!searchTerm) return true;
+    
+    const searchLower = searchTerm.toLowerCase();
+    const firstName = member.first_name?.toLowerCase() || '';
+    const lastName = member.last_name?.toLowerCase() || '';
+    const email = member.email?.toLowerCase() || '';
+    const position = member.primary_position?.title?.toLowerCase() || '';
+    
+    return (
+      firstName.includes(searchLower) ||
+      lastName.includes(searchLower) ||
+      email.includes(searchLower) ||
+      position.includes(searchLower)
+    );
+  });
+
+  const handleBackToProject = () => {
+    if (isProjectSpecific && project) {
+      navigate(`/films/${project.id}`);
+    } else {
+      navigate('/films');
+    }
+  };
+
+  const handleEditCrew = (crewMember: CrewMember) => {
+    setEditModal({ isOpen: true, crewMember });
+  };
+
+  const handleDeleteCrew = (crewMember: CrewMember) => {
+    setDeleteModal({ isOpen: true, crewMember });
+  };
+
+  const handleSaveCrew = async (data: CrewMemberData) => {
+    if (!editModal.crewMember) return;
+    
+    try {
+      const updatedMember = await crewService.updateCrewMember(
+        editModal.crewMember.id.toString(),
+        data
+      );
+      
+      setCrew(prev => prev.map(member => 
+        member.id === updatedMember.id ? updatedMember : member
+      ));
+      
+      console.log('✅ Crew member updated:', updatedMember);
+    } catch (error) {
+      console.error('❌ Failed to update crew member:', error);
+      throw error;
+    }
+  };
+
+  const handleConfirmDelete = async (crewMember: CrewMember) => {
+    try {
+      await crewService.deleteCrewMember(crewMember.id.toString());
+      
+      setCrew(prev => prev.filter(member => member.id !== crewMember.id));
+      setAssignments(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(crewMember.id.toString());
+        return newSet;
+      });
+      
+      console.log('✅ Crew member deleted:', crewMember.first_name, crewMember.last_name);
+    } catch (error) {
+      console.error('❌ Failed to delete crew member:', error);
+      throw error;
+    }
+  };
+
+  const handleExportCrew = () => {
+    const csvData = crew.map(member => ({
+      'First Name': member.first_name,
+      'Last Name': member.last_name,
+      'Email': member.email,
+      'Phone': member.phone || '',
+      'Position': member.primary_position?.title || '',
+      'Department': member.primary_position?.department.name || '',
+      'Status': member.is_active ? 'Active' : 'Inactive'
+    }));
+
+    const csvContent = [
+      Object.keys(csvData[0]).join(','),
+      ...csvData.map(row => Object.values(row).map(value => `"${value}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `crew-export-${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  if (loading || (isProjectSpecific && projectLoading)) {
+    return (
+      <PageContainer>
+        <LoadingContainer>
+          <LoadingSpinner
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+          />
+          Loading crew data...
+        </LoadingContainer>
+      </PageContainer>
+    );
+  }
+
+  if (error) {
+    return (
+      <PageContainer>
+        <Header>CREW</Header>
+        <ErrorContainer
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          {error}
+          <br />
+          <Button onClick={loadData} style={{ marginTop: '1rem' }}>
+            Retry
+          </Button>
+        </ErrorContainer>
+      </PageContainer>
+    );
+  }
+
+  const stats = getCrewStats();
+
+  return (
+    <PageContainer>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+      >
+        {isProjectSpecific && (
+          <BackButton 
+            variant="ghost" 
+            icon={<ArrowLeft size={16} />}
+            onClick={handleBackToProject}
+          >
+            Back to project
+          </BackButton>
+        )}
+
+        {project && (
+          <ProjectBanner
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+          >
+            <ProjectTitle>
+              {project.title}
+            </ProjectTitle>
+            <ProjectMeta>
+              {project.status} • {project.location_primary}
+            </ProjectMeta>
+          </ProjectBanner>
+        )}
+
+        <Header>CREW {isProjectSpecific ? 'MANAGEMENT' : 'DATABASE'}</Header>
+        <Subtitle>
+          {isProjectSpecific 
+            ? `Managing crew for ${project?.title}`
+            : 'Film crew management and assignments'
+          }
+        </Subtitle>
+
+        <ControlsRow>
+          <SearchContainer>
+            <SearchIcon />
+            <SearchInput
+              type="text"
+              placeholder="Search crew..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </SearchContainer>
+          
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <Button 
+              variant="secondary"
+              icon={<Share size={16} />}
+              onClick={handleExportCrew}
+            >
+              Export
+            </Button>
+            <Button 
+              variant="secondary"
+              icon={<Filter size={16} />}
+            >
+              Filter
+            </Button>
+            <Button 
+              variant="primary" 
+              icon={<Plus size={16} />}
+              onClick={() => setEditModal({ isOpen: true, crewMember: null })}
+            >
+              Add crew
+            </Button>
+          </div>
+        </ControlsRow>
+
+        <MetricsGrid>
+          <MetricCard
+            $accent="#667eea"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+          >
+            <MetricHeader>
+              <div>
+                <MetricValue>{stats.totalCrew}</MetricValue>
+                <MetricLabel>
+                  <Users size={16} />
+                  Total crew
+                </MetricLabel>
+              </div>
+              <MetricIcon>
+                <Users size={24} />
+              </MetricIcon>
+            </MetricHeader>
+          </MetricCard>
+          
+          <MetricCard
+            $accent="#10b981"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <MetricHeader>
+              <div>
+                <MetricValue>{stats.activeCrew}</MetricValue>
+                <MetricLabel>
+                  <TrendingUp size={16} />
+                  Active
+                </MetricLabel>
+              </div>
+              <MetricIcon>
+                <Star size={24} />
+              </MetricIcon>
+            </MetricHeader>
+          </MetricCard>
+          
+          {isProjectSpecific && (
+            <MetricCard
+              $accent="#eab308"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <MetricHeader>
+                <div>
+                  <MetricValue>{stats.assignedCrew}</MetricValue>
+                  <MetricLabel>Assigned</MetricLabel>
+                </div>
+                <MetricIcon>
+                  <Briefcase size={24} />
+                </MetricIcon>
+              </MetricHeader>
+            </MetricCard>
+          )}
+          
+          <MetricCard
+            $accent="#8b5cf6"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            <MetricHeader>
+              <div>
+                <MetricValue>{stats.totalDepartments}</MetricValue>
+                <MetricLabel>
+                  <Building2 size={16} />
+                  Departments
+                </MetricLabel>
+              </div>
+              <MetricIcon>
+                <Building2 size={24} />
+              </MetricIcon>
+            </MetricHeader>
+          </MetricCard>
+        </MetricsGrid>
+
+        {filteredCrew.length === 0 ? (
+          <EmptyState>
+            <div className="icon">👥</div>
+            <h3>
+              {searchTerm ? 'No results' : 'No crew members'}
+            </h3>
+            <p>
+              {searchTerm 
+                ? `No crew members matching "${searchTerm}"`
+                : 'Start by adding your first crew member'
+              }
+            </p>
+          </EmptyState>
+        ) : (
+          <CrewGrid>
+            <AnimatePresence>
+              {filteredCrew.map((member, index) => {
+                const isAssigned = assignments.has(member.id.toString());
+                
+                return (
+                  <CrewCard
+                    key={member.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    transition={{ delay: index * 0.05 }}
+                    layout
+                  >
+                    <CrewHeader>
+                      <CrewInfo>
+                        <CrewName>
+                          {member.first_name || 'First'} {member.last_name || 'Last'}
+                        </CrewName>
+                        <CrewPosition>
+                          {member.primary_position?.title || 'No position'}
+                        </CrewPosition>
+                        
+                        <CrewMeta>
+                          <div>
+                            <MetaLabel>Email</MetaLabel>
+                            <MetaValue>{member.email || 'No email'}</MetaValue>
+                          </div>
+                        </CrewMeta>
+                      </CrewInfo>
+                      
+                      {member.primary_position?.department && (
+                        <DepartmentBadge $color={member.primary_position.department.color_code}>
+                          {member.primary_position.department.name}
+                        </DepartmentBadge>
+                      )}
+                    </CrewHeader>
+
+                    <CrewActions>
+                      {isProjectSpecific && project && (
+                        <CrewAssignButton
+                          crewMember={member}
+                          project={project}
+                          isAssigned={isAssigned}
+                          onAssign={handleAssignCrew}
+                          onUnassign={handleUnassignCrew}
+                        />
+                      )}
+                      
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon={<Edit3 size={14} />}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditCrew(member);
+                        }}
+                      >
+                        Edit
+                      </Button>
+                      
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        icon={<Trash2 size={14} />}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteCrew(member);
+                        }}
+                      >
+                        Delete
+                      </Button>
+                    </CrewActions>
+                  </CrewCard>
+                );
+              })}
+            </AnimatePresence>
+          </CrewGrid>
+        )}
+      </motion.div>
+
+      {/* Modals */}
+      <CrewEditModal
+        isOpen={editModal.isOpen}
+        onClose={() => setEditModal({ isOpen: false, crewMember: null })}
+        crewMember={editModal.crewMember}
+        positions={positions}
+        departments={departments}
+        onSave={handleSaveCrew}
+      />
+
+      <CrewDeleteModal
+        isOpen={deleteModal.isOpen}
+        onClose={() => setDeleteModal({ isOpen: false, crewMember: null })}
+        crewMember={deleteModal.crewMember}
+        onDelete={handleConfirmDelete}
+      />
+    </PageContainer>
+  );
+};
+
+export default Crew;

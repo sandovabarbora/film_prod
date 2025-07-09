@@ -1,0 +1,80 @@
+// src/pages/ProjectDetail.tsx - Kompaktní JetBrains-Style Project Detail
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import styled from 'styled-components';
+
+      {/* Modaly - s null safety */}
+
+      {/* Modaly - s null safety */}
+      <AnimatePresence>
+        {isEditModalOpen && project && (
+          <ProjectEditModal
+            project={project}
+            onClose={() => setIsEditModalOpen(false)}
+            onSave={handleSaveProject}
+            isOpen={true}
+            isEditing={true}
+          />
+        )}
+        
+        {isDeleteModalOpen && project && (
+          <ProjectDeleteModal
+            project={project}
+            onClose={() => setIsDeleteModalOpen(false)}
+            onConfirm={handleDeleteProject}
+            isOpen={true}
+          />
+        )}
+      </AnimatePresence>
+    </PageContainer>
+  );
+};
+
+export default ProjectDetail;
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid #ef4444',
+              borderRadius: '16px',
+              padding: '1rem',
+              marginTop: '1rem',
+              color: '#ef4444',
+              textAlign: 'center',
+              fontFamily: 'JetBrains Mono, monospace',
+              fontSize: '0.875rem'
+            }}
+          >
+            ⚠️ API_CONNECTION_FAILED
+          </motion.div>
+        )}
+      </ContentWrapper>
+
+      {/* Modaly - s null safety */}
+      <AnimatePresence>
+        {isEditModalOpen && project && (
+          <ProjectEditModal
+            project={project}
+            onClose={() => setIsEditModalOpen(false)}
+            onSave={handleSaveProject}
+            isOpen={true}
+            isEditing={true}
+          />
+        )}
+        
+        {isDeleteModalOpen && project && (
+          <ProjectDeleteModal
+            project={project}
+            onClose={() => setIsDeleteModalOpen(false)}
+            onConfirm={handleDeleteProject}
+            isOpen={true}
+          />
+        )}
+      </AnimatePresence>
+    </PageContainer>
+  );
+};
+
+export default ProjectDetail;

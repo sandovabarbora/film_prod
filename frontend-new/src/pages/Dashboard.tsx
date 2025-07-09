@@ -1,591 +1,324 @@
-// src/pages/Dashboard.tsx - Cinema Grade Dashboard
-import React from 'react';
+// src/pages/Dashboard.tsx - JetBrains-Style Modern Dashboard
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
+import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
+import { 
+  Play, Calendar, Users, DollarSign, TrendingUp, Clock, 
+  Film, Camera, MapPin, Star, Award, Target, Zap, AlertCircle,
+  CheckCircle, XCircle, Activity, BarChart3, PieChart, 
+  ArrowUp, ArrowDown, Eye, Edit, Plus, Bell, Code, Terminal,
+  Cpu, Database, GitBranch, Layers, Monitor, Server
+} from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
-export default function Dashboard(): JSX.Element {
-  const navigate = useNavigate();
-  const { user } = useAuth();
-
-  const quickActions = [
-    {
-      id: 'new-project',
-      title: 'Nový projekt',
-      description: 'Založit filmový projekt',
-      icon: '🎬',
-      gradient: 'sunset',
-      onClick: () => navigate('/films'),
-    },
-    {
-      id: 'add-crew',
-      title: 'Přidat štáb',
-      description: 'Nové členy týmu',
-      icon: '👥',
-      gradient: 'ocean',
-      onClick: () => navigate('/crew'),
-    },
-    {
-      id: 'schedule',
-      title: 'Naplánovat natáčení',
-      description: 'Vytvořit harmonogram',
-      icon: '📅',
-      gradient: 'success',
-      onClick: () => navigate('/schedule'),
-    },
-    {
-      id: 'documents',
-      title: 'Upload dokumenty',
-      description: 'Skripty a materiály',
-      icon: '📄',
-      gradient: 'text',
-      onClick: () => navigate('/documents'),
-    },
-  ];
-
-  const projects = [
-    {
-      id: '1',
-      title: 'Letní příběh',
-      status: 'production',
-      progress: 65,
-      daysLeft: 12,
-      budget: { used: 450000, total: 800000 },
-      team: 24,
-      scenes: { completed: 45, total: 72 },
-    },
-    {
-      id: '2', 
-      title: 'Městské legendy',
-      status: 'pre_production',
-      progress: 30,
-      daysLeft: 45,
-      budget: { used: 120000, total: 600000 },
-      team: 18,
-      scenes: { completed: 12, total: 58 },
-    },
-    {
-      id: '3',
-      title: 'Dokumentární série',
-      status: 'post_production',
-      progress: 85,
-      daysLeft: 8,
-      budget: { used: 280000, total: 350000 },
-      team: 12,
-      scenes: { completed: 34, total: 34 },
-    },
-  ];
-
-  const upcomingEvents = [
-    {
-      id: '1',
-      title: 'Natáčení - Scéna 15',
-      time: 'Dnes 09:00',
-      location: 'Studio A',
-      type: 'shooting',
-      priority: 'high',
-    },
-    {
-      id: '2',
-      title: 'Meeting s režisérem',
-      time: 'Zítra 14:00',
-      location: 'Kancelář',
-      type: 'meeting',
-      priority: 'medium',
-    },
-    {
-      id: '3',
-      title: 'Deadline - Post produkce',
-      time: 'Za 3 dny',
-      location: 'Remote',
-      type: 'deadline',
-      priority: 'high',
-    },
-  ];
-
-  const getStatusInfo = (status: string) => {
-    const statusMap = {
-      development: { label: 'Vývoj', color: 'development' },
-      pre_production: { label: 'Příprava', color: 'preProduction' },
-      production: { label: 'Natáčení', color: 'production' },
-      post_production: { label: 'Postprodukce', color: 'postProduction' },
-      completed: { label: 'Dokončeno', color: 'completed' },
-    };
-    return statusMap[status] || { label: status, color: 'cancelled' };
-  };
-
-  return (
-    <DashboardContainer>
-      {/* Hero Section */}
-      <HeroSection className="glass-light fade-in-up">
-        <HeroContent>
-          <WelcomeText>Vítejte zpět,</WelcomeText>
-          <UserName className="gradient-text">{user?.display_name || user?.username}! 👋</UserName>
-          <HeroStats>
-            <span>3 aktivní projekty</span>
-            <StatDivider>•</StatDivider>
-            <span>2 úkoly dnes</span>
-            <StatDivider>•</StatDivider>
-            <span>67% průměrný pokrok</span>
-          </HeroStats>
-        </HeroContent>
-        
-        <HeroMetrics>
-          <MetricCard className="delay-100">
-            <MetricValue>3</MetricValue>
-            <MetricLabel>Aktivní projekty</MetricLabel>
-          </MetricCard>
-          <MetricCard className="delay-200">
-            <MetricValue>24</MetricValue>
-            <MetricLabel>Členů štábu</MetricLabel>
-          </MetricCard>
-          <MetricCard className="delay-300">
-            <MetricValue>67%</MetricValue>
-            <MetricLabel>Průměrný pokrok</MetricLabel>
-          </MetricCard>
-        </HeroMetrics>
-      </HeroSection>
-
-      {/* Quick Actions */}
-      <SectionContainer>
-        <SectionHeader>
-          <SectionTitle>Rychlé akce</SectionTitle>
-          <SectionSubtitle>Nejčastěji používané funkce</SectionSubtitle>
-        </SectionHeader>
-        
-        <QuickActionsGrid>
-          {quickActions.map((action, index) => (
-            <ActionCard 
-              key={action.id} 
-              className={`glass-light interactive delay-${(index + 1) * 100}`}
-              onClick={action.onClick}
-            >
-              <ActionIcon>{action.icon}</ActionIcon>
-              <ActionContent>
-                <ActionTitle>{action.title}</ActionTitle>
-                <ActionDescription>{action.description}</ActionDescription>
-              </ActionContent>
-              <ActionGradient gradient={action.gradient} />
-            </ActionCard>
-          ))}
-        </QuickActionsGrid>
-      </SectionContainer>
-
-      {/* Main Dashboard Grid */}
-      <DashboardGrid>
-        {/* Projects Column */}
-        <ProjectsSection>
-          <SectionHeader>
-            <SectionTitle>Aktuální projekty</SectionTitle>
-            <ViewAllButton onClick={() => navigate('/films')}>
-              Zobrazit všechny →
-            </ViewAllButton>
-          </SectionHeader>
-          
-          <ProjectsList>
-            {projects.map((project, index) => (
-              <ProjectCard 
-                key={project.id} 
-                className={`glass-medium interactive delay-${(index + 1) * 150}`}
-                onClick={() => navigate(`/films/${project.id}`)}
-              >
-                <ProjectHeader>
-                  <ProjectInfo>
-                    <ProjectTitle>{project.title}</ProjectTitle>
-                    <ProjectMeta>
-                      <StatusBadge color={getStatusInfo(project.status).color}>
-                        {getStatusInfo(project.status).label}
-                      </StatusBadge>
-                      <ProjectDays>{project.daysLeft} dní zbývá</ProjectDays>
-                    </ProjectMeta>
-                  </ProjectInfo>
-                  <ProjectTeam>
-                    <TeamIcon>👥</TeamIcon>
-                    <TeamCount>{project.team}</TeamCount>
-                  </ProjectTeam>
-                </ProjectHeader>
-
-                <ProjectMetrics>
-                  <MetricRow>
-                    <MetricInfo>
-                      <MetricName>Pokrok</MetricName>
-                      <MetricValue>{project.progress}%</MetricValue>
-                    </MetricInfo>
-                    <ProgressBar>
-                      <ProgressFill width={project.progress} color="primary" />
-                    </ProgressBar>
-                  </MetricRow>
-
-                  <MetricRow>
-                    <MetricInfo>
-                      <MetricName>Rozpočet</MetricName>
-                      <MetricValue>
-                        {Math.round(project.budget.used / 1000)}k / {Math.round(project.budget.total / 1000)}k
-                      </MetricValue>
-                    </MetricInfo>
-                    <ProgressBar>
-                      <ProgressFill 
-                        width={(project.budget.used / project.budget.total) * 100} 
-                        color="warning"
-                      />
-                    </ProgressBar>
-                  </MetricRow>
-
-                  <MetricRow>
-                    <MetricInfo>
-                      <MetricName>Scény</MetricName>
-                      <MetricValue>
-                        {project.scenes.completed} / {project.scenes.total}
-                      </MetricValue>
-                    </MetricInfo>
-                    <ProgressBar>
-                      <ProgressFill 
-                        width={(project.scenes.completed / project.scenes.total) * 100} 
-                        color="success"
-                      />
-                    </ProgressBar>
-                  </MetricRow>
-                </ProjectMetrics>
-              </ProjectCard>
-            ))}
-          </ProjectsList>
-        </ProjectsSection>
-
-        {/* Events & Info Column */}
-        <SidebarSection>
-          {/* Upcoming Events */}
-          <EventsSection className="glass-light fade-in-up delay-400">
-            <SectionTitle>Nadcházející události</SectionTitle>
-            
-            <EventsList>
-              {upcomingEvents.map((event, index) => (
-                <EventCard key={event.id} priority={event.priority}>
-                  <EventIcon type={event.type}>
-                    {event.type === 'shooting' && '🎬'}
-                    {event.type === 'meeting' && '🤝'}
-                    {event.type === 'deadline' && '⏰'}
-                  </EventIcon>
-                  <EventContent>
-                    <EventTitle>{event.title}</EventTitle>
-                    <EventTime>{event.time}</EventTime>
-                    <EventLocation>📍 {event.location}</EventLocation>
-                  </EventContent>
-                  <EventPriority priority={event.priority} />
-                </EventCard>
-              ))}
-            </EventsList>
-
-            <ViewCalendarButton onClick={() => navigate('/schedule')}>
-              Zobrazit kalendář
-            </ViewCalendarButton>
-          </EventsSection>
-
-          {/* Weather Widget */}
-          <WeatherSection className="glass-medium fade-in-up delay-500">
-            <WeatherHeader>
-              <WeatherTitle>Počasí pro natáčení</WeatherTitle>
-              <WeatherLocation>Praha, CZ</WeatherLocation>
-            </WeatherHeader>
-            
-            <WeatherContent>
-              <WeatherMain>
-                <WeatherIcon>☀️</WeatherIcon>
-                <WeatherTemp>18°C</WeatherTemp>
-              </WeatherMain>
-              <WeatherDetails>
-                <WeatherDesc>Slunečno</WeatherDesc>
-                <WeatherWind>Vítr: 5 km/h</WeatherWind>
-                <WeatherHumidity>Vlhkost: 65%</WeatherHumidity>
-              </WeatherDetails>
-            </WeatherContent>
-
-            <WeatherButton onClick={() => navigate('/weather')}>
-              Týdenní předpověď
-            </WeatherButton>
-          </WeatherSection>
-
-          {/* Quick Stats */}
-          <StatsSection className="glass-heavy fade-in-up delay-600">
-            <StatsTitle>Dnešní přehled</StatsTitle>
-            <StatsGrid>
-              <StatItem>
-                <StatIcon>🎬</StatIcon>
-                <StatValue>3</StatValue>
-                <StatLabel>Scény dnes</StatLabel>
-              </StatItem>
-              <StatItem>
-                <StatIcon>👥</StatIcon>
-                <StatValue>12</StatValue>
-                <StatLabel>Štáb online</StatLabel>
-              </StatItem>
-              <StatItem>
-                <StatIcon>📄</StatIcon>
-                <StatValue>5</StatValue>
-                <StatLabel>Nové dokumenty</StatLabel>
-              </StatItem>
-              <StatItem>
-                <StatIcon>💬</StatIcon>
-                <StatValue>7</StatValue>
-                <StatLabel>Zprávy</StatLabel>
-              </StatItem>
-            </StatsGrid>
-          </StatsSection>
-        </SidebarSection>
-      </DashboardGrid>
-    </DashboardContainer>
-  );
-}
-
-// Styled Components - Cinema Grade Design
+// JetBrains-style Container
 const DashboardContainer = styled.div`
   min-height: 100vh;
-  padding: ${props => props.theme.spacing['2xl']};
-  background: ${props => props.theme.colors.background};
+  background: ${({ theme }) => theme.colors.background.primary};
+  padding: ${({ theme }) => theme.spacing[6]};
   
-  @media (max-width: ${props => props.theme.breakpoints.lg}) {
-    padding: ${props => props.theme.spacing.lg};
+  /* JetBrains-style grid pattern */
+  background-image: 
+    linear-gradient(rgba(102, 126, 234, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(102, 126, 234, 0.03) 1px, transparent 1px);
+  background-size: 20px 20px;
+`;
+
+const DashboardGrid = styled.div`
+  display: grid;
+  max-width: 1600px;
+  margin: 0 auto;
+  gap: ${({ theme }) => theme.spacing[6]};
+  grid-template-areas:
+    "hero hero hero sidebar"
+    "metrics metrics metrics sidebar"
+    "projects projects analytics sidebar"
+    "timeline timeline timeline sidebar";
+  grid-template-columns: 1fr 1fr 1fr 320px;
+  
+  @media (max-width: 1400px) {
+    grid-template-areas:
+      "hero hero hero"
+      "metrics metrics metrics"
+      "projects projects analytics"
+      "timeline timeline sidebar";
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+  
+  @media (max-width: 768px) {
+    grid-template-areas:
+      "hero"
+      "metrics"
+      "projects"
+      "analytics"
+      "timeline"
+      "sidebar";
+    grid-template-columns: 1fr;
   }
 `;
 
-const HeroSection = styled.section`
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: ${props => props.theme.spacing['3xl']};
-  align-items: center;
-  padding: ${props => props.theme.spacing['3xl']};
-  border-radius: ${props => props.theme.borderRadius['3xl']};
-  margin-bottom: ${props => props.theme.spacing['3xl']};
+// JetBrains-style Hero Section
+const HeroSection = styled(motion.section)`
+  grid-area: hero;
+  background: ${({ theme }) => theme.colors.glass.surface};
+  backdrop-filter: ${({ theme }) => theme.cinema.backdrop.medium};
+  border: 1px solid ${({ theme }) => theme.colors.glass.border};
+  border-radius: ${({ theme }) => theme.borderRadius['2xl']};
+  padding: ${({ theme }) => theme.spacing[8]};
   position: relative;
   overflow: hidden;
-
+  
+  /* JetBrains-style accent border */
   &::before {
     content: '';
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
-    bottom: 0;
-    background: ${props => props.theme.colors.gradients.hero};
-    opacity: 0.03;
-    z-index: -1;
-  }
-
-  @media (max-width: ${props => props.theme.breakpoints.lg}) {
-    grid-template-columns: 1fr;
-    gap: ${props => props.theme.spacing.xl};
-    text-align: center;
+    height: 3px;
+    background: ${({ theme }) => theme.colors.gradients.primary};
   }
 `;
 
 const HeroContent = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${props => props.theme.spacing.md};
+  position: relative;
+  z-index: 2;
 `;
 
-const WelcomeText = styled.p`
-  font-family: ${props => props.theme.typography.fontFamily.elegant};
-  font-size: ${props => props.theme.typography.fontSize.xl};
-  color: ${props => props.theme.colors.textSecondary};
-  margin: 0;
+const WelcomeText = styled.h1`
+  font-family: ${({ theme }) => theme.typography.fontFamily.display};
+  font-size: clamp(2rem, 4vw, 3.5rem);
+  font-weight: ${({ theme }) => theme.typography.fontWeight.light};
+  color: ${({ theme }) => theme.colors.text.primary};
+  margin-bottom: ${({ theme }) => theme.spacing[3]};
+  line-height: ${({ theme }) => theme.typography.lineHeight.tight};
+  
+  /* JetBrains-style gradient text */
+  background: ${({ theme }) => theme.colors.gradients.primary};
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 `;
 
-const UserName = styled.h1`
-  font-family: ${props => props.theme.typography.fontFamily.display};
-  font-size: clamp(${props => props.theme.typography.fontSize['3xl']}, 5vw, ${props => props.theme.typography.fontSize['5xl']});
-  font-weight: ${props => props.theme.typography.fontWeight.bold};
-  margin: 0;
-  line-height: 1.1;
+const TimeStamp = styled.div`
+  font-family: ${({ theme }) => theme.typography.fontFamily.mono};
+  font-size: ${({ theme }) => theme.typography.fontSize.sm};
+  color: ${({ theme }) => theme.colors.text.muted};
+  margin-bottom: ${({ theme }) => theme.spacing[6]};
+  letter-spacing: 0.5px;
 `;
 
 const HeroStats = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: ${({ theme }) => theme.spacing[4]};
+`;
+
+const HeroStatItem = styled(motion.div)`
+  background: ${({ theme }) => theme.colors.glass.surface};
+  border: 1px solid ${({ theme }) => theme.colors.glass.border};
+  border-radius: ${({ theme }) => theme.borderRadius.xl};
+  padding: ${({ theme }) => theme.spacing[4]};
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing[1]};
+  transition: ${({ theme }) => theme.transitions.cinema};
+  
+  &:hover {
+    background: ${({ theme }) => theme.colors.glass.surfaceHover};
+    border-color: ${({ theme }) => theme.colors.text.accent};
+    transform: translateY(-2px);
+  }
+`;
+
+const StatIcon = styled.div`
+  color: ${({ theme }) => theme.colors.text.accent};
+  margin-bottom: ${({ theme }) => theme.spacing[1]};
+`;
+
+const StatValue = styled.div`
+  font-family: ${({ theme }) => theme.typography.fontFamily.mono};
+  font-size: ${({ theme }) => theme.typography.fontSize.xl};
+  font-weight: ${({ theme }) => theme.typography.fontWeight.bold};
+  color: ${({ theme }) => theme.colors.text.primary};
+`;
+
+const StatLabel = styled.div`
+  font-family: ${({ theme }) => theme.typography.fontFamily.mono};
+  font-size: ${({ theme }) => theme.typography.fontSize.xs};
+  color: ${({ theme }) => theme.colors.text.muted};
+  text-transform: uppercase;
+  letter-spacing: 1px;
+`;
+
+// JetBrains-style Metrics Grid
+const MetricsGrid = styled.section`
+  grid-area: metrics;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: ${({ theme }) => theme.spacing[4]};
+`;
+
+const MetricCard = styled(motion.div)<{ $accent?: string }>`
+  background: ${({ theme }) => theme.colors.glass.surface};
+  backdrop-filter: ${({ theme }) => theme.cinema.backdrop.light};
+  border: 1px solid ${({ theme }) => theme.colors.glass.border};
+  border-radius: ${({ theme }) => theme.borderRadius['2xl']};
+  padding: ${({ theme }) => theme.spacing[6]};
+  position: relative;
+  overflow: hidden;
+  transition: ${({ theme }) => theme.transitions.cinema};
+  
+  &:hover {
+    background: ${({ theme }) => theme.colors.glass.surfaceHover};
+    border-color: ${({ theme }) => theme.colors.text.accent};
+    transform: translateY(-4px);
+    box-shadow: ${({ theme }) => theme.shadows.cinema};
+  }
+  
+  /* JetBrains-style accent indicator */
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: ${({ $accent, theme }) => $accent || theme.colors.text.accent};
+  }
+`;
+
+const MetricHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: ${({ theme }) => theme.spacing[4]};
+`;
+
+const MetricIcon = styled.div`
+  width: 48px;
+  height: 48px;
+  border-radius: ${({ theme }) => theme.borderRadius.xl};
+  background: ${({ theme }) => theme.colors.text.accent}15;
   display: flex;
   align-items: center;
-  gap: ${props => props.theme.spacing.md};
-  font-family: ${props => props.theme.typography.fontFamily.mono};
-  font-size: ${props => props.theme.typography.fontSize.sm};
-  color: ${props => props.theme.colors.textSecondary};
-  
-  @media (max-width: ${props => props.theme.breakpoints.sm}) {
-    flex-direction: column;
-    gap: ${props => props.theme.spacing.xs};
-  }
+  justify-content: center;
+  color: ${({ theme }) => theme.colors.text.accent};
 `;
 
-const StatDivider = styled.span`
-  color: ${props => props.theme.colors.primary};
-  
-  @media (max-width: ${props => props.theme.breakpoints.sm}) {
-    display: none;
-  }
-`;
-
-const HeroMetrics = styled.div`
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: ${props => props.theme.spacing.lg};
-  
-  @media (max-width: ${props => props.theme.breakpoints.md}) {
-    grid-template-columns: 1fr;
-  }
-`;
-
-const MetricCard = styled.div`
-  text-align: center;
-  padding: ${props => props.theme.spacing.xl};
-  border-radius: ${props => props.theme.borderRadius['2xl']};
-  background: ${props => props.theme.glass.medium.background};
-  backdrop-filter: ${props => props.theme.glass.medium.backdrop};
-  border: 1px solid ${props => props.theme.glass.medium.border};
-  transition: all ${props => props.theme.transitions.normal};
-
-  &:hover {
-    transform: translateY(-4px);
-    box-shadow: ${props => props.theme.shadows.glassSm};
-  }
+const MetricChange = styled.span<{ $positive: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.spacing[1]};
+  font-family: ${({ theme }) => theme.typography.fontFamily.mono};
+  font-size: ${({ theme }) => theme.typography.fontSize.sm};
+  color: ${({ $positive, theme }) => 
+    $positive ? theme.colors.status.wrap : theme.colors.status.shoot
+  };
+  font-weight: ${({ theme }) => theme.typography.fontWeight.medium};
 `;
 
 const MetricValue = styled.div`
-  font-family: ${props => props.theme.typography.fontFamily.display};
-  font-size: ${props => props.theme.typography.fontSize['3xl']};
-  font-weight: ${props => props.theme.typography.fontWeight.bold};
-  color: ${props => props.theme.colors.primary};
-  margin-bottom: ${props => props.theme.spacing.xs};
+  font-family: ${({ theme }) => theme.typography.fontFamily.mono};
+  font-size: ${({ theme }) => theme.typography.fontSize['3xl']};
+  font-weight: ${({ theme }) => theme.typography.fontWeight.bold};
+  color: ${({ theme }) => theme.colors.text.primary};
+  margin-bottom: ${({ theme }) => theme.spacing[1]};
 `;
 
 const MetricLabel = styled.div`
-  font-size: ${props => props.theme.typography.fontSize.sm};
-  color: ${props => props.theme.colors.textSecondary};
-  font-weight: ${props => props.theme.typography.fontWeight.medium};
+  font-family: ${({ theme }) => theme.typography.fontFamily.mono};
+  font-size: ${({ theme }) => theme.typography.fontSize.sm};
+  color: ${({ theme }) => theme.colors.text.secondary};
+  text-transform: uppercase;
+  letter-spacing: 1px;
 `;
 
-const SectionContainer = styled.section`
-  margin-bottom: ${props => props.theme.spacing['4xl']};
+// JetBrains-style Projects Section
+const ProjectsSection = styled(motion.section)`
+  grid-area: projects;
+  background: ${({ theme }) => theme.colors.glass.surface};
+  backdrop-filter: ${({ theme }) => theme.cinema.backdrop.light};
+  border: 1px solid ${({ theme }) => theme.colors.glass.border};
+  border-radius: ${({ theme }) => theme.borderRadius['2xl']};
+  padding: ${({ theme }) => theme.spacing[6]};
+  overflow: hidden;
 `;
 
 const SectionHeader = styled.div`
-  margin-bottom: ${props => props.theme.spacing.xl};
   display: flex;
-  align-items: flex-end;
   justify-content: space-between;
-  
-  @media (max-width: ${props => props.theme.breakpoints.sm}) {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: ${props => props.theme.spacing.md};
-  }
+  align-items: center;
+  margin-bottom: ${({ theme }) => theme.spacing[6]};
+  padding-bottom: ${({ theme }) => theme.spacing[4]};
+  border-bottom: 1px solid ${({ theme }) => theme.colors.glass.border};
 `;
 
 const SectionTitle = styled.h2`
-  font-family: ${props => props.theme.typography.fontFamily.display};
-  font-size: ${props => props.theme.typography.fontSize['2xl']};
-  font-weight: ${props => props.theme.typography.fontWeight.semibold};
-  color: ${props => props.theme.colors.text};
-  margin: 0;
-`;
-
-const SectionSubtitle = styled.p`
-  font-size: ${props => props.theme.typography.fontSize.base};
-  color: ${props => props.theme.colors.textSecondary};
-  margin: ${props => props.theme.spacing.xs} 0 0 0;
+  font-family: ${({ theme }) => theme.typography.fontFamily.mono};
+  font-size: ${({ theme }) => theme.typography.fontSize.xl};
+  font-weight: ${({ theme }) => theme.typography.fontWeight.bold};
+  color: ${({ theme }) => theme.colors.text.primary};
+  text-transform: uppercase;
+  letter-spacing: 1px;
 `;
 
 const ViewAllButton = styled.button`
   background: none;
-  border: none;
-  color: ${props => props.theme.colors.primary};
-  font-weight: ${props => props.theme.typography.fontWeight.medium};
+  border: 1px solid ${({ theme }) => theme.colors.glass.border};
+  color: ${({ theme }) => theme.colors.text.accent};
+  font-family: ${({ theme }) => theme.typography.fontFamily.mono};
+  font-size: ${({ theme }) => theme.typography.fontSize.sm};
+  font-weight: ${({ theme }) => theme.typography.fontWeight.medium};
   cursor: pointer;
-  transition: all ${props => props.theme.transitions.fast};
+  padding: ${({ theme }) => theme.spacing[2]} ${({ theme }) => theme.spacing[4]};
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  transition: ${({ theme }) => theme.transitions.normal};
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   
   &:hover {
-    color: ${props => props.theme.colors.primaryDark};
-    transform: translateX(4px);
+    background: ${({ theme }) => theme.colors.text.accent}15;
+    border-color: ${({ theme }) => theme.colors.text.accent};
   }
 `;
-
-const QuickActionsGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: ${props => props.theme.spacing.xl};
-`;
-
-const ActionCard = styled.div`
-  position: relative;
-  padding: ${props => props.theme.spacing.xl};
-  border-radius: ${props => props.theme.borderRadius['2xl']};
-  cursor: pointer;
-  overflow: hidden;
-  transition: all ${props => props.theme.transitions.normal};
-
-  &:hover {
-    transform: translateY(-6px);
-    box-shadow: ${props => props.theme.shadows.xl};
-  }
-`;
-
-const ActionGradient = styled.div<{ gradient: string }>`
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: ${props => props.theme.colors.gradients[props.gradient] || props.theme.colors.gradients.sunset};
-  border-radius: ${props => props.theme.borderRadius['2xl']} ${props => props.theme.borderRadius['2xl']} 0 0;
-`;
-
-const ActionIcon = styled.div`
-  font-size: 2.5rem;
-  margin-bottom: ${props => props.theme.spacing.md};
-`;
-
-const ActionContent = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${props => props.theme.spacing.xs};
-`;
-
-const ActionTitle = styled.h3`
-  font-size: ${props => props.theme.typography.fontSize.lg};
-  font-weight: ${props => props.theme.typography.fontWeight.semibold};
-  color: ${props => props.theme.colors.text};
-  margin: 0;
-`;
-
-const ActionDescription = styled.p`
-  font-size: ${props => props.theme.typography.fontSize.sm};
-  color: ${props => props.theme.colors.textSecondary};
-  margin: 0;
-`;
-
-const DashboardGrid = styled.div`
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: ${props => props.theme.spacing['3xl']};
-  
-  @media (max-width: ${props => props.theme.breakpoints.lg}) {
-    grid-template-columns: 1fr;
-    gap: ${props => props.theme.spacing.xl};
-  }
-`;
-
-const ProjectsSection = styled.div``;
 
 const ProjectsList = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${props => props.theme.spacing.xl};
+  gap: ${({ theme }) => theme.spacing[3]};
 `;
 
-const ProjectCard = styled.div`
-  padding: ${props => props.theme.spacing.xl};
-  border-radius: ${props => props.theme.borderRadius['2xl']};
+const ProjectCard = styled(motion.div)`
+  background: ${({ theme }) => theme.colors.glass.surface};
+  border: 1px solid ${({ theme }) => theme.colors.glass.border};
+  border-radius: ${({ theme }) => theme.borderRadius.xl};
+  padding: ${({ theme }) => theme.spacing[4]};
+  transition: ${({ theme }) => theme.transitions.cinema};
   cursor: pointer;
-  transition: all ${props => props.theme.transitions.normal};
-
+  position: relative;
+  
   &:hover {
-    transform: translateY(-4px);
-    box-shadow: ${props => props.theme.shadows.xl};
+    background: ${({ theme }) => theme.colors.glass.surfaceHover};
+    border-color: ${({ theme }) => theme.colors.text.accent};
+    transform: translateX(4px);
+  }
+  
+  /* JetBrains-style hover accent */
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 0;
+    background: ${({ theme }) => theme.colors.text.accent};
+    transition: width 0.3s ease;
+  }
+  
+  &:hover::before {
+    width: 3px;
   }
 `;
 
@@ -593,321 +326,579 @@ const ProjectHeader = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: ${props => props.theme.spacing.lg};
-`;
-
-const ProjectInfo = styled.div`
-  flex: 1;
+  margin-bottom: ${({ theme }) => theme.spacing[3]};
 `;
 
 const ProjectTitle = styled.h3`
-  font-size: ${props => props.theme.typography.fontSize.xl};
-  font-weight: ${props => props.theme.typography.fontWeight.semibold};
-  color: ${props => props.theme.colors.text};
-  margin: 0 0 ${props => props.theme.spacing.sm} 0;
+  font-family: ${({ theme }) => theme.typography.fontFamily.display};
+  font-size: ${({ theme }) => theme.typography.fontSize.lg};
+  font-weight: ${({ theme }) => theme.typography.fontWeight.semibold};
+  color: ${({ theme }) => theme.colors.text.primary};
+`;
+
+const StatusBadge = styled.span<{ $status: string }>`
+  padding: ${({ theme }) => theme.spacing[1]} ${({ theme }) => theme.spacing[3]};
+  border-radius: ${({ theme }) => theme.borderRadius.full};
+  font-family: ${({ theme }) => theme.typography.fontFamily.mono};
+  font-size: ${({ theme }) => theme.typography.fontSize.xs};
+  font-weight: ${({ theme }) => theme.typography.fontWeight.medium};
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  background: ${({ $status, theme }) => {
+    const colors = {
+      production: theme.colors.status.shoot,
+      pre_production: theme.colors.status.prep,
+      post_production: theme.colors.status.post,
+      completed: theme.colors.status.wrap,
+    };
+    return colors[$status] + '20';
+  }};
+  color: ${({ $status, theme }) => {
+    const colors = {
+      production: theme.colors.status.shoot,
+      pre_production: theme.colors.status.prep,
+      post_production: theme.colors.status.post,
+      completed: theme.colors.status.wrap,
+    };
+    return colors[$status];
+  }};
+  border: 1px solid ${({ $status, theme }) => {
+    const colors = {
+      production: theme.colors.status.shoot,
+      pre_production: theme.colors.status.prep,
+      post_production: theme.colors.status.post,
+      completed: theme.colors.status.wrap,
+    };
+    return colors[$status];
+  }};
 `;
 
 const ProjectMeta = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${props => props.theme.spacing.md};
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: ${({ theme }) => theme.spacing[4]};
+  margin-top: ${({ theme }) => theme.spacing[3]};
 `;
 
-const StatusBadge = styled.span<{ color: string }>`
-  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.md};
-  border-radius: ${props => props.theme.borderRadius.full};
-  font-size: ${props => props.theme.typography.fontSize.xs};
-  font-weight: ${props => props.theme.typography.fontWeight.medium};
-  color: white;
-  background: ${props => props.theme.colors[props.color] || props.theme.colors.primary};
-`;
-
-const ProjectDays = styled.span`
-  font-size: ${props => props.theme.typography.fontSize.sm};
-  color: ${props => props.theme.colors.textSecondary};
-`;
-
-const ProjectTeam = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${props => props.theme.spacing.xs};
-  background: ${props => props.theme.glass.light.background};
-  padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.md};
-  border-radius: ${props => props.theme.borderRadius.full};
-`;
-
-const TeamIcon = styled.span`
-  font-size: 1rem;
-`;
-
-const TeamCount = styled.span`
-  font-size: ${props => props.theme.typography.fontSize.sm};
-  font-weight: ${props => props.theme.typography.fontWeight.medium};
-  color: ${props => props.theme.colors.text};
-`;
-
-const ProjectMetrics = styled.div`
+const MetaItem = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${props => props.theme.spacing.md};
+  gap: ${({ theme }) => theme.spacing[1]};
 `;
 
-const MetricRow = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${props => props.theme.spacing.xs};
+const MetaLabel = styled.span`
+  font-family: ${({ theme }) => theme.typography.fontFamily.mono};
+  font-size: ${({ theme }) => theme.typography.fontSize.xs};
+  color: ${({ theme }) => theme.colors.text.muted};
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 `;
 
-const MetricInfo = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-`;
-
-const MetricName = styled.span`
-  font-size: ${props => props.theme.typography.fontSize.sm};
-  color: ${props => props.theme.colors.textSecondary};
+const MetaValue = styled.span`
+  font-family: ${({ theme }) => theme.typography.fontFamily.mono};
+  font-size: ${({ theme }) => theme.typography.fontSize.sm};
+  font-weight: ${({ theme }) => theme.typography.fontWeight.medium};
+  color: ${({ theme }) => theme.colors.text.primary};
 `;
 
 const ProgressBar = styled.div`
-  height: 8px;
-  background: ${props => props.theme.colors.background};
-  border-radius: ${props => props.theme.borderRadius.full};
+  width: 100%;
+  height: 4px;
+  background: ${({ theme }) => theme.colors.glass.border};
+  border-radius: 2px;
   overflow: hidden;
+  margin-top: ${({ theme }) => theme.spacing[3]};
 `;
 
-const ProgressFill = styled.div<{ width: number; color: string }>`
+const ProgressFill = styled.div<{ $width: number }>`
   height: 100%;
-  width: ${props => props.width}%;
-  background: ${props => props.theme.colors[props.color] || props.theme.colors.primary};
-  border-radius: ${props => props.theme.borderRadius.full};
-  transition: width 0.6s ease;
+  width: ${({ $width }) => $width}%;
+  background: ${({ theme }) => theme.colors.gradients.primary};
+  transition: width 0.8s ease;
 `;
 
-const SidebarSection = styled.div`
+// Analytics a další sekce - stejný JetBrains styl...
+const AnalyticsSection = styled(motion.section)`
+  grid-area: analytics;
+  background: ${({ theme }) => theme.colors.glass.surface};
+  backdrop-filter: ${({ theme }) => theme.cinema.backdrop.light};
+  border: 1px solid ${({ theme }) => theme.colors.glass.border};
+  border-radius: ${({ theme }) => theme.borderRadius['2xl']};
+  padding: ${({ theme }) => theme.spacing[6]};
+`;
+
+const ChartPlaceholder = styled.div`
+  height: 200px;
+  background: ${({ theme }) => theme.colors.glass.surface};
+  border: 2px dashed ${({ theme }) => theme.colors.glass.border};
+  border-radius: ${({ theme }) => theme.borderRadius.xl};
   display: flex;
   flex-direction: column;
-  gap: ${props => props.theme.spacing.xl};
+  align-items: center;
+  justify-content: center;
+  color: ${({ theme }) => theme.colors.text.muted};
+  margin-top: ${({ theme }) => theme.spacing[4]};
 `;
 
-const EventsSection = styled.div`
-  padding: ${props => props.theme.spacing.xl};
-  border-radius: ${props => props.theme.borderRadius['2xl']};
+const TimelineSection = styled(motion.section)`
+  grid-area: timeline;
+  background: ${({ theme }) => theme.colors.glass.surface};
+  backdrop-filter: ${({ theme }) => theme.cinema.backdrop.light};
+  border: 1px solid ${({ theme }) => theme.colors.glass.border};
+  border-radius: ${({ theme }) => theme.borderRadius['2xl']};
+  padding: ${({ theme }) => theme.spacing[6]};
 `;
 
-const EventsList = styled.div`
+const TimelineItem = styled(motion.div)`
   display: flex;
-  flex-direction: column;
-  gap: ${props => props.theme.spacing.md};
-  margin: ${props => props.theme.spacing.lg} 0;
-`;
-
-const EventCard = styled.div<{ priority: string }>`
-  display: flex;
-  align-items: flex-start;
-  gap: ${props => props.theme.spacing.md};
-  padding: ${props => props.theme.spacing.md};
-  border-radius: ${props => props.theme.borderRadius.lg};
-  background: ${props => props.theme.glass.light.background};
-  border-left: 3px solid ${props => 
-    props.priority === 'high' ? props.theme.colors.error :
-    props.priority === 'medium' ? props.theme.colors.warning :
-    props.theme.colors.success
-  };
-  transition: all ${props => props.theme.transitions.fast};
-
-  &:hover {
-    background: ${props => props.theme.colors.surfaceHover};
-    transform: translateX(4px);
+  gap: ${({ theme }) => theme.spacing[4]};
+  padding: ${({ theme }) => theme.spacing[3]} 0;
+  border-bottom: 1px solid ${({ theme }) => theme.colors.glass.border};
+  
+  &:last-child {
+    border-bottom: none;
   }
 `;
 
-const EventIcon = styled.div<{ type: string }>`
-  font-size: 1.5rem;
-  flex-shrink: 0;
-`;
-
-const EventContent = styled.div`
-  flex: 1;
-  min-width: 0;
-`;
-
-const EventTitle = styled.h4`
-  font-size: ${props => props.theme.typography.fontSize.sm};
-  font-weight: ${props => props.theme.typography.fontWeight.medium};
-  color: ${props => props.theme.colors.text};
-  margin: 0 0 ${props => props.theme.spacing.xs} 0;
-`;
-
-const EventTime = styled.div`
-  font-size: ${props => props.theme.typography.fontSize.xs};
-  color: ${props => props.theme.colors.primary};
-  font-weight: ${props => props.theme.typography.fontWeight.medium};
-  margin-bottom: 2px;
-`;
-
-const EventLocation = styled.div`
-  font-size: ${props => props.theme.typography.fontSize.xs};
-  color: ${props => props.theme.colors.textSecondary};
-`;
-
-const EventPriority = styled.div<{ priority: string }>`
-  width: 8px;
-  height: 8px;
+const TimelineDot = styled.div<{ $color: string }>`
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  background: ${props => 
-    props.priority === 'high' ? props.theme.colors.error :
-    props.priority === 'medium' ? props.theme.colors.warning :
-    props.theme.colors.success
-  };
+  background: ${({ $color }) => $color};
+  margin-top: ${({ theme }) => theme.spacing[1]};
   flex-shrink: 0;
-  margin-top: 4px;
+  box-shadow: 0 0 0 3px ${({ $color }) => $color}20;
 `;
 
-const ViewCalendarButton = styled.button`
-  width: 100%;
-  padding: ${props => props.theme.spacing.md};
-  background: ${props => props.theme.colors.gradients.ocean};
-  color: white;
-  border: none;
-  border-radius: ${props => props.theme.borderRadius.lg};
-  font-weight: ${props => props.theme.typography.fontWeight.medium};
-  cursor: pointer;
-  transition: all ${props => props.theme.transitions.normal};
-
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: ${props => props.theme.shadows.primary};
-  }
-`;
-
-const WeatherSection = styled.div`
-  padding: ${props => props.theme.spacing.xl};
-  border-radius: ${props => props.theme.borderRadius['2xl']};
-`;
-
-const WeatherHeader = styled.div`
-  margin-bottom: ${props => props.theme.spacing.lg};
-`;
-
-const WeatherTitle = styled.h3`
-  font-size: ${props => props.theme.typography.fontSize.lg};
-  font-weight: ${props => props.theme.typography.fontWeight.semibold};
-  color: ${props => props.theme.colors.text};
-  margin: 0 0 ${props => props.theme.spacing.xs} 0;
-`;
-
-const WeatherLocation = styled.p`
-  font-size: ${props => props.theme.typography.fontSize.sm};
-  color: ${props => props.theme.colors.textSecondary};
-  margin: 0;
-`;
-
-const WeatherContent = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${props => props.theme.spacing.lg};
-  margin-bottom: ${props => props.theme.spacing.lg};
-`;
-
-const WeatherMain = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${props => props.theme.spacing.md};
-`;
-
-const WeatherIcon = styled.div`
-  font-size: 3rem;
-`;
-
-const WeatherTemp = styled.div`
-  font-family: ${props => props.theme.typography.fontFamily.display};
-  font-size: ${props => props.theme.typography.fontSize['3xl']};
-  font-weight: ${props => props.theme.typography.fontWeight.bold};
-  color: ${props => props.theme.colors.text};
-`;
-
-const WeatherDetails = styled.div`
+const TimelineContent = styled.div`
   flex: 1;
 `;
 
-const WeatherDesc = styled.div`
-  font-size: ${props => props.theme.typography.fontSize.base};
-  color: ${props => props.theme.colors.text};
-  margin-bottom: ${props => props.theme.spacing.xs};
+const TimelineDate = styled.div`
+  font-family: ${({ theme }) => theme.typography.fontFamily.mono};
+  font-size: ${({ theme }) => theme.typography.fontSize.xs};
+  color: ${({ theme }) => theme.colors.text.muted};
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: ${({ theme }) => theme.spacing[1]};
 `;
 
-const WeatherWind = styled.div`
-  font-size: ${props => props.theme.typography.fontSize.sm};
-  color: ${props => props.theme.colors.textSecondary};
+const TimelineTitle = styled.div`
+  font-family: ${({ theme }) => theme.typography.fontFamily.body};
+  font-size: ${({ theme }) => theme.typography.fontSize.sm};
+  font-weight: ${({ theme }) => theme.typography.fontWeight.medium};
+  color: ${({ theme }) => theme.colors.text.primary};
 `;
 
-const WeatherHumidity = styled.div`
-  font-size: ${props => props.theme.typography.fontSize.sm};
-  color: ${props => props.theme.colors.textSecondary};
+// Sidebar - JetBrains style
+const Sidebar = styled.aside`
+  grid-area: sidebar;
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing[4]};
 `;
 
-const WeatherButton = styled.button`
-  width: 100%;
-  padding: ${props => props.theme.spacing.md};
-  background: none;
-  border: 1px solid ${props => props.theme.colors.border};
-  border-radius: ${props => props.theme.borderRadius.lg};
-  color: ${props => props.theme.colors.text};
-  cursor: pointer;
-  transition: all ${props => props.theme.transitions.normal};
+const SidebarWidget = styled(motion.div)<{ $variant?: string }>`
+  background: ${({ theme }) => theme.colors.glass.surface};
+  backdrop-filter: ${({ theme }) => theme.cinema.backdrop.light};
+  border: 1px solid ${({ theme }) => theme.colors.glass.border};
+  border-radius: ${({ theme }) => theme.borderRadius['2xl']};
+  padding: ${({ theme }) => theme.spacing[5]};
+  position: relative;
+  overflow: hidden;
+  
+  ${({ $variant, theme }) => $variant === 'accent' && `
+    background: ${theme.colors.gradients.primary};
+    color: white;
+    border: none;
+    
+    * {
+      color: white !important;
+    }
+  `}
+`;
 
-  &:hover {
-    background: ${props => props.theme.colors.surfaceHover};
-    border-color: ${props => props.theme.colors.primary};
+const WidgetTitle = styled.h3`
+  font-family: ${({ theme }) => theme.typography.fontFamily.mono};
+  font-size: ${({ theme }) => theme.typography.fontSize.sm};
+  font-weight: ${({ theme }) => theme.typography.fontWeight.bold};
+  color: ${({ theme }) => theme.colors.text.primary};
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: ${({ theme }) => theme.spacing[4]};
+`;
+
+const NotificationItem = styled(motion.div)`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.spacing[3]};
+  padding: ${({ theme }) => theme.spacing[3]} 0;
+  border-bottom: 1px solid ${({ theme }) => theme.colors.glass.border};
+  
+  &:last-child {
+    border-bottom: none;
   }
 `;
 
-const StatsSection = styled.div`
-  padding: ${props => props.theme.spacing.xl};
-  border-radius: ${props => props.theme.borderRadius['2xl']};
-`;
+const Dashboard: React.FC = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [currentTime, setCurrentTime] = useState(new Date());
 
-const StatsTitle = styled.h3`
-  font-size: ${props => props.theme.typography.fontSize.lg};
-  font-weight: ${props => props.theme.typography.fontWeight.semibold};
-  color: ${props => props.theme.colors.text};
-  margin: 0 0 ${props => props.theme.spacing.lg} 0;
-`;
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
-const StatsGrid = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: ${props => props.theme.spacing.md};
-`;
+  const metrics = [
+    {
+      label: 'Active Projects',
+      value: '03',
+      change: '+02',
+      positive: true,
+      icon: <Film />,
+      accent: '#667eea'
+    },
+    {
+      label: 'Total Budget',
+      value: '$2.4M',
+      change: '+12%',
+      positive: true,
+      icon: <DollarSign />,
+      accent: '#10b981'
+    },
+    {
+      label: 'Crew Members',
+      value: '47',
+      change: '+05',
+      positive: true,
+      icon: <Users />,
+      accent: '#f59e0b'
+    },
+    {
+      label: 'Completed Scenes',
+      value: '128',
+      change: '+15',
+      positive: true,
+      icon: <CheckCircle />,
+      accent: '#ef4444'
+    }
+  ];
 
-const StatItem = styled.div`
-  text-align: center;
-  padding: ${props => props.theme.spacing.md};
-  border-radius: ${props => props.theme.borderRadius.lg};
-  background: ${props => props.theme.glass.light.background};
-  transition: all ${props => props.theme.transitions.fast};
+  const projects = [
+    {
+      id: 1,
+      title: 'Cinema Verité',
+      status: 'production',
+      progress: 68,
+      daysLeft: 12,
+      budget: 800000,
+      location: 'Praha'
+    },
+    {
+      id: 2,
+      title: 'Digital Dreams',
+      status: 'pre_production',
+      progress: 35,
+      daysLeft: 45,
+      budget: 600000,
+      location: 'Brno'
+    },
+    {
+      id: 3,
+      title: 'Urban Stories',
+      status: 'post_production',
+      progress: 92,
+      daysLeft: 8,
+      budget: 350000,
+      location: 'Remote'
+    }
+  ];
 
-  &:hover {
-    transform: translateY(-2px);
-    background: ${props => props.theme.colors.surfaceHover};
-  }
-`;
+  const timelineEvents = [
+    {
+      date: 'TODAY',
+      title: 'Scene 12-15 Shooting Begins',
+      color: '#ef4444'
+    },
+    {
+      date: 'TOMORROW',
+      title: 'First Cut Review Session',
+      color: '#f59e0b'
+    },
+    {
+      date: '+3 DAYS',
+      title: 'New Cast Member Audition',
+      color: '#10b981'
+    },
+    {
+      date: '+1 WEEK',
+      title: 'Final Budget Approval',
+      color: '#667eea'
+    }
+  ];
 
-const StatIcon = styled.div`
-  font-size: 1.5rem;
-  margin-bottom: ${props => props.theme.spacing.xs};
-`;
+  const notifications = [
+    {
+      id: 1,
+      title: 'Director Message Received',
+      icon: <Bell size={16} />,
+      time: '5m ago'
+    },
+    {
+      id: 2,
+      title: 'Schedule Updated',
+      icon: <Calendar size={16} />,
+      time: '1h ago'
+    },
+    {
+      id: 3,
+      title: 'Budget Recalculated',
+      icon: <DollarSign size={16} />,
+      time: '2h ago'
+    }
+  ];
 
-const StatValue = styled.div`
-  font-family: ${props => props.theme.typography.fontFamily.display};
-  font-size: ${props => props.theme.typography.fontSize.xl};
-  font-weight: ${props => props.theme.typography.fontWeight.bold};
-  color: ${props => props.theme.colors.primary};
-  margin-bottom: 2px;
-`;
+  const getStatusLabel = (status: string) => {
+    const labels = {
+      production: 'SHOOTING',
+      pre_production: 'PREP',
+      post_production: 'POST',
+      completed: 'WRAPPED'
+    };
+    return labels[status] || status;
+  };
 
-const StatLabel = styled.div`
-  font-size: ${props => props.theme.typography.fontSize.xs};
-  color: ${props => props.theme.colors.textSecondary};
-`;
+  return (
+    <DashboardContainer>
+      <DashboardGrid>
+        {/* Hero Section */}
+        <HeroSection
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <HeroContent>
+            <WelcomeText>
+              Welcome back, {user?.display_name || user?.username}
+            </WelcomeText>
+            <TimeStamp>
+              {currentTime.toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })} • {currentTime.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </TimeStamp>
+            <HeroStats>
+              <HeroStatItem whileHover={{ scale: 1.02 }}>
+                <StatIcon><Activity size={20} /></StatIcon>
+                <StatValue>03</StatValue>
+                <StatLabel>ACTIVE</StatLabel>
+              </HeroStatItem>
+              <HeroStatItem whileHover={{ scale: 1.02 }}>
+                <StatIcon><Clock size={20} /></StatIcon>
+                <StatValue>02</StatValue>
+                <StatLabel>URGENT</StatLabel>
+              </HeroStatItem>
+              <HeroStatItem whileHover={{ scale: 1.02 }}>
+                <StatIcon><TrendingUp size={20} /></StatIcon>
+                <StatValue>68%</StatValue>
+                <StatLabel>PROGRESS</StatLabel>
+              </HeroStatItem>
+            </HeroStats>
+          </HeroContent>
+        </HeroSection>
+
+        {/* Metrics Grid */}
+        <MetricsGrid>
+          {metrics.map((metric, index) => (
+            <MetricCard
+              key={index}
+              $accent={metric.accent}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 + index * 0.1 }}
+              whileHover={{ scale: 1.02 }}
+            >
+              <MetricHeader>
+                <MetricIcon>{metric.icon}</MetricIcon>
+                <MetricChange $positive={metric.positive}>
+                  {metric.positive ? <ArrowUp size={16} /> : <ArrowDown size={16} />}
+                  {metric.change}
+                </MetricChange>
+              </MetricHeader>
+              <MetricValue>{metric.value}</MetricValue>
+              <MetricLabel>{metric.label}</MetricLabel>
+            </MetricCard>
+          ))}
+        </MetricsGrid>
+
+        {/* Projects Section */}
+        <ProjectsSection
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <SectionHeader>
+            <SectionTitle>ACTIVE_PROJECTS</SectionTitle>
+            <ViewAllButton onClick={() => navigate('/films')}>
+              VIEW_ALL
+            </ViewAllButton>
+          </SectionHeader>
+          <ProjectsList>
+            {projects.map((project, index) => (
+              <ProjectCard
+                key={project.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.5 + index * 0.1 }}
+                whileHover={{ scale: 1.01 }}
+                onClick={() => navigate(`/films/${project.id}`)}
+              >
+                <ProjectHeader>
+                  <ProjectTitle>{project.title}</ProjectTitle>
+                  <StatusBadge $status={project.status}>
+                    {getStatusLabel(project.status)}
+                  </StatusBadge>
+                </ProjectHeader>
+                <ProjectMeta>
+                  <MetaItem>
+                    <MetaLabel>LOCATION</MetaLabel>
+                    <MetaValue>{project.location}</MetaValue>
+                  </MetaItem>
+                  <MetaItem>
+                    <MetaLabel>DAYS_LEFT</MetaLabel>
+                    <MetaValue>{project.daysLeft}</MetaValue>
+                  </MetaItem>
+                  <MetaItem>
+                    <MetaLabel>PROGRESS</MetaLabel>
+                    <MetaValue>{project.progress}%</MetaValue>
+                  </MetaItem>
+                </ProjectMeta>
+                <ProgressBar>
+                  <ProgressFill $width={project.progress} />
+                </ProgressBar>
+              </ProjectCard>
+            ))}
+          </ProjectsList>
+        </ProjectsSection>
+
+        {/* Analytics Section */}
+        <AnalyticsSection
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+        >
+          <SectionHeader>
+            <SectionTitle>ANALYTICS</SectionTitle>
+            <ViewAllButton onClick={() => navigate('/budget')}>
+              DETAILS
+            </ViewAllButton>
+          </SectionHeader>
+          <ChartPlaceholder>
+            <BarChart3 size={48} style={{ opacity: 0.3, marginBottom: '1rem' }} />
+            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px' }}>
+              BUDGET_ANALYTICS_MODULE
+            </div>
+            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.625rem', opacity: 0.6, marginTop: '0.5rem' }}>
+              Chart.js | D3.js Implementation
+            </div>
+          </ChartPlaceholder>
+        </AnalyticsSection>
+
+        {/* Timeline Section */}
+        <TimelineSection
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8 }}
+        >
+          <SectionHeader>
+            <SectionTitle>TIMELINE</SectionTitle>
+          </SectionHeader>
+          {timelineEvents.map((event, index) => (
+            <TimelineItem
+              key={index}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.9 + index * 0.1 }}
+            >
+              <TimelineDot $color={event.color} />
+              <TimelineContent>
+                <TimelineDate>{event.date}</TimelineDate>
+                <TimelineTitle>{event.title}</TimelineTitle>
+              </TimelineContent>
+            </TimelineItem>
+          ))}
+        </TimelineSection>
+
+        {/* Sidebar */}
+        <Sidebar>
+          {/* Weather Widget */}
+          <SidebarWidget
+            $variant="accent"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 1.0 }}
+          >
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>☀️</div>
+              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '2rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>
+                22°C
+              </div>
+              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                PRAGUE_SUNNY
+              </div>
+              <div style={{ fontSize: '0.75rem', marginTop: '1rem', opacity: 0.8 }}>
+                Perfect weather for outdoor shooting
+              </div>
+            </div>
+          </SidebarWidget>
+
+          {/* Notifications */}
+          <SidebarWidget
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 1.2 }}
+          >
+            <WidgetTitle>NOTIFICATIONS</WidgetTitle>
+            {notifications.map((notification, index) => (
+              <NotificationItem
+                key={notification.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 1.3 + index * 0.1 }}
+              >
+                <div style={{ color: '#667eea' }}>{notification.icon}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ 
+                    fontFamily: 'JetBrains Mono, monospace', 
+                    fontSize: '0.75rem', 
+                    fontWeight: 'medium',
+                    marginBottom: '0.25rem'
+                  }}>
+                    {notification.title}
+                  </div>
+                  <div style={{ 
+                    fontFamily: 'JetBrains Mono, monospace', 
+                    fontSize: '0.625rem', 
+                    color: '#6b7280',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px'
+                  }}>
+                    {notification.time}
+                  </div>
+                </div>
+              </NotificationItem>
+            ))}
+          </SidebarWidget>
+        </Sidebar>
+      </DashboardGrid>
+    </DashboardContainer>
+  );
+};
+
+export default Dashboard;

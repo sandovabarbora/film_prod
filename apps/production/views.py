@@ -5,11 +5,10 @@ from django.utils import timezone
 from django.db.models import Count, Q
 from .models import Production, Scene, Shot, Take, Location
 from .serializers import (
-    ProductionListSerializer, ProductionDetailSerializer,
+    ProductionListSerializer, ProductionDetailSerializer, ProductionCreateUpdateSerializer,
     SceneListSerializer, SceneDetailSerializer,
     ShotListSerializer, ShotDetailSerializer,
-    TakeSerializer, LocationSerializer,
-    LiveDashboardSerializer
+    TakeSerializer, LocationSerializer
 )
 
 class ProductionViewSet(viewsets.ModelViewSet):
@@ -18,7 +17,10 @@ class ProductionViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action == 'list':
             return ProductionListSerializer
-        return ProductionDetailSerializer
+        elif self.action in ['create', 'update', 'partial_update']:
+            return ProductionCreateUpdateSerializer  # 🎯 Simplified serializer pro CREATE/UPDATE
+        else:
+            return ProductionDetailSerializer  # Pro retrieve s full data
     
     @action(detail=True, methods=['get'])
     def dashboard(self, request, pk=None):
@@ -28,8 +30,8 @@ class ProductionViewSet(viewsets.ModelViewSet):
         # Get today's shooting day
         today = timezone.now().date()
         try:
-            from schedule.models import ShootingDay, StatusUpdate
-            shooting_day = ShootingDay.objects.get(production=production, date=today)
+            from apps.schedule.models import ShootingDay, StatusUpdate
+            shooting_day = ShootingDay.objects.get(production=production, shoot_date=today)
             
             # Latest status update
             latest_status = StatusUpdate.objects.filter(
@@ -38,8 +40,8 @@ class ProductionViewSet(viewsets.ModelViewSet):
             ).first()
             
             # Calculate progress
-            scenes_today = shooting_day.scheduled_scenes.all()
-            completed_scenes_today = scenes_today.filter(scene__status='completed').count()
+            scenes_today = shooting_day.scene_schedules.all()
+            completed_scenes_today = scenes_today.filter(status='completed').count()
             
             # Get all shots for today's scenes
             today_scene_ids = scenes_today.values_list('scene_id', flat=True)
@@ -47,13 +49,13 @@ class ProductionViewSet(viewsets.ModelViewSet):
             completed_shots_today = shots_today.filter(status='completed').count()
             
             pages_shot_today = sum(
-                scene.scene.estimated_pages 
-                for scene in scenes_today.filter(scene__status='completed')
+                scene.scene.estimated_pages or 0 
+                for scene in scenes_today.filter(status='completed')
             )
             
             # Next scene calculation
             next_scene_scheduled = scenes_today.filter(
-                scene__status__in=['not_shot', 'in_progress']
+                status__in=['scheduled', 'setup']
             ).first()
             
             dashboard_data = {
@@ -64,20 +66,18 @@ class ProductionViewSet(viewsets.ModelViewSet):
                 'scenes_completed_today': completed_scenes_today,
                 'shots_completed_today': completed_shots_today,
                 'pages_shot_today': pages_shot_today,
-                'day_start': shooting_day.crew_call,
+                'day_start': shooting_day.general_call,
                 'current_time': timezone.now().time(),
                 'estimated_wrap': shooting_day.estimated_wrap,
-                'behind_schedule_minutes': latest_status.minutes_behind if latest_status else 0,
                 'next_scene': next_scene_scheduled.scene.scene_number if next_scene_scheduled else '',
-                'next_estimated_time': next_scene_scheduled.estimated_start_time if next_scene_scheduled else None,
+                'next_estimated_time': next_scene_scheduled.estimated_start if next_scene_scheduled else None,
                 'current_temperature': None,  # TODO: Weather API integration
                 'weather_description': '',
                 'crew_on_set': 0,  # TODO: Check-in tracking
-                'crew_total': production.crew.filter(is_active=True).count(),
+                'crew_total': production.crew.filter(is_active=True).count() if hasattr(production, 'crew') else 0,
             }
             
-            serializer = LiveDashboardSerializer(dashboard_data)
-            return Response(serializer.data)
+            return Response(dashboard_data)
             
         except ShootingDay.DoesNotExist:
             return Response(
@@ -92,14 +92,16 @@ class ProductionViewSet(viewsets.ModelViewSet):
         data = request.data
         
         try:
-            from schedule.models import ShootingDay, StatusUpdate
-            from crew.models import CrewMember
+            from apps.schedule.models import ShootingDay, StatusUpdate
+            from apps.crew.models import CrewMember
             
             today = timezone.now().date()
-            shooting_day = ShootingDay.objects.get(production=production, date=today)
+            shooting_day = ShootingDay.objects.get(production=production, shoot_date=today)
             
-            # Get crew member (in real app would be from auth)
-            crew_member = production.crew.first()  # Simplified for MVP
+            # Get crew member (simplified for MVP)
+            crew_member = None
+            if hasattr(production, 'crew') and production.crew.exists():
+                crew_member = production.crew.first()
             
             status_update = StatusUpdate.objects.create(
                 production=production,
@@ -108,12 +110,8 @@ class ProductionViewSet(viewsets.ModelViewSet):
                 current_scene=data.get('current_scene', ''),
                 current_shot=data.get('current_shot', ''),
                 current_status=data.get('current_status', 'prep'),
-                estimated_next_shot=data.get('estimated_next_shot'),
-                notes=data.get('notes', ''),
-                minutes_behind=data.get('minutes_behind', 0)
+                message=data.get('notes', ''),
             )
-            
-            # TODO: Send real-time notification via WebSocket
             
             return Response({'status': 'updated', 'id': status_update.id})
             
@@ -201,8 +199,6 @@ class ShotViewSet(viewsets.ModelViewSet):
                 shot.completed_at = timezone.now()
             
             shot.save()
-            
-            # TODO: Send WebSocket notification to production dashboard
             
             return Response({'status': f'Shot status updated to {new_status}'})
         

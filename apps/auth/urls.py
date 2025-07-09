@@ -1,9 +1,12 @@
+# apps/auth/urls.py - přidejte CSRF endpoint
+
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 from .views import (
     CustomTokenObtainPairView, AuthViewSet, UserViewSet, 
-    UserProfileViewSet, ProductionAccessViewSet
+    UserProfileViewSet, ProductionAccessViewSet,
+    get_csrf_token  # <-- PŘIDAT TYTO IMPORTY
 )
 
 router = DefaultRouter()
@@ -13,6 +16,9 @@ router.register(r'profiles', UserProfileViewSet, basename='profiles')
 router.register(r'production-access', ProductionAccessViewSet, basename='production-access')
 
 urlpatterns = [
+    # CSRF endpoint - MUSÍ BÝT PRVNÍ!
+    path('csrf/', get_csrf_token, name='csrf_token_simple'),  # alternativa
+    
     # JWT Token endpoints
     path('token/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),

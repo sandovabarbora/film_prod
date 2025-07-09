@@ -1,147 +1,48 @@
-// src/components/layout/AppLayout/AppLayout.tsx
-import React, { ReactNode, useState, useEffect } from 'react';
+import React from 'react';
 import styled from 'styled-components';
-import { Sidebar, useSidebar } from '../Sidebar';
+import { Sidebar } from '../Sidebar';
+import { useSidebar } from '../../../hooks/useSidebar';
 
 interface AppLayoutProps {
-  children: ReactNode;
-  className?: string;
+  children: React.ReactNode;
 }
 
-export function AppLayout({ children, className }: AppLayoutProps) {
-  const { isVisible, toggle, show, hide } = useSidebar();
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-
-  // Mobile detection
-  useEffect(() => {
-    const checkMobile = () => {
-      const mobile = window.innerWidth < 768;
-      setIsMobile(mobile);
-    };
-    
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  // Calculate content margin based on sidebar state
-  const getContentMargin = () => {
-    if (!isVisible || isMobile) return 0; // No margin on mobile or when hidden
-    return isCollapsed ? 80 : 280; // Collapsed vs expanded width
-  };
-
-  return (
-    <LayoutContainer className={className}>
-      <Sidebar 
-        isVisible={isVisible} 
-        onVisibilityChange={(visible) => visible ? show() : hide()}
-        onCollapseChange={(collapsed) => setIsCollapsed(collapsed)}
-      />
-      <MainContent $marginLeft={getContentMargin()}>
-        {children}
-      </MainContent>
-    </LayoutContainer>
-  );
-}
-
-// Layout s external sidebar control
-interface ControlledAppLayoutProps {
-  children: ReactNode;
-  sidebarVisible?: boolean;
-  onSidebarToggle?: () => void;
-  className?: string;
-}
-
-export function ControlledAppLayout({ 
-  children, 
-  sidebarVisible = true, 
-  onSidebarToggle,
-  className 
-}: ControlledAppLayoutProps) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-
-  // Mobile detection
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  // Calculate content margin based on sidebar state
-  const getContentMargin = () => {
-    if (!sidebarVisible || isMobile) return 0;
-    return isCollapsed ? 80 : 280;
-  };
-
-  return (
-    <LayoutContainer className={className}>
-      <Sidebar 
-        isVisible={sidebarVisible} 
-        onVisibilityChange={onSidebarToggle}
-        onCollapseChange={(collapsed) => setIsCollapsed(collapsed)}
-      />
-      <MainContent $marginLeft={getContentMargin()}>
-        {children}
-      </MainContent>
-    </LayoutContainer>
-  );
-}
-
-// Hook pro sidebar info v komponentách
-export function useSidebarLayout() {
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [isVisible, setIsVisible] = useState(true);
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  const getSidebarWidth = () => {
-    if (!isVisible) return 0;
-    if (isMobile) return 0; // mobile sidebar is overlay
-    return isCollapsed ? 80 : 280;
-  };
-
-  return {
-    isCollapsed,
-    setIsCollapsed,
-    isVisible,
-    setIsVisible,
-    isMobile,
-    sidebarWidth: getSidebarWidth(),
-  };
-}
-
-// Styled components
 const LayoutContainer = styled.div`
   display: flex;
   min-height: 100vh;
-  overflow: hidden;
+  background: ${({ theme }) => theme.colors.background};
 `;
 
-const MainContent = styled.main<{ $marginLeft: number }>`
+const MainContent = styled.main<{ $sidebarCollapsed: boolean }>`
   flex: 1;
-  min-height: 100vh;
-  background: ${props => props.theme.colors.background};
-  overflow-y: auto;
-  transition: margin-left ${props => props.theme.transitions.normal};
-  margin-left: ${props => props.$marginLeft}px;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease;
+  margin-left: ${({ $sidebarCollapsed }) => $sidebarCollapsed ? '80px' : '280px'};
   
-  /* Ensure content doesn't go under sidebar on mobile */
-  @media (max-width: 767px) {
-    margin-left: 0 !important;
+  @media (max-width: ${({ theme }) => theme.breakpoints.lg}) {
+    margin-left: 0;
   }
 `;
+
+const ContentWrapper = styled.div`
+  flex: 1;
+  overflow-y: auto;
+`;
+
+const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
+  const { isCollapsed } = useSidebar();
+
+  return (
+    <LayoutContainer>
+      <Sidebar />
+      <MainContent $sidebarCollapsed={isCollapsed}>
+        <ContentWrapper>
+          {children}
+        </ContentWrapper>
+      </MainContent>
+    </LayoutContainer>
+  );
+};
+
+export default AppLayout;

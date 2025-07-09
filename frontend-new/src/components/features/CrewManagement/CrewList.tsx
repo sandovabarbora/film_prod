@@ -1,241 +1,412 @@
 import React, { useState } from 'react';
 import styled from 'styled-components';
-import { motion } from 'framer-motion';
+import { useCrew } from '../../../hooks/useCrew';
+import { Button } from '../../ui/Button';
+import { Card } from '../../ui/Card';
 
-const CrewContainer = styled.div`
-  background: ${({ theme }) => theme.colors.gray[900]};
-  border: 1px solid ${({ theme }) => theme.colors.gray[700]};
-  border-radius: 12px;
-  overflow: hidden;
+const Container = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.spacing.lg};
+  padding: ${({ theme }) => theme.spacing.lg};
 `;
 
-const CrewHeader = styled.div`
-  padding: ${({ theme }) => theme.spacing.lg};
-  border-bottom: 1px solid ${({ theme }) => theme.colors.gray[700]};
+const Header = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: ${({ theme }) => theme.spacing.md};
 `;
 
-const SearchBar = styled.input`
-  background: ${({ theme }) => theme.colors.gray[800]};
-  border: 1px solid ${({ theme }) => theme.colors.gray[700]};
-  border-radius: 8px;
+const Title = styled.h2`
+  font-size: ${({ theme }) => theme.typography.sizes.xl};
+  font-weight: ${({ theme }) => theme.typography.weights.bold};
+  color: ${({ theme }) => theme.colors.text.primary};
+  margin: 0;
+`;
+
+const Controls = styled.div`
+  display: flex;
+  gap: ${({ theme }) => theme.spacing.md};
+  align-items: center;
+  flex-wrap: wrap;
+`;
+
+const SearchInput = styled.input`
   padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.md};
-  color: ${({ theme }) => theme.colors.primary.light};
-  width: 300px;
+  border: 1px solid ${({ theme }) => theme.colors.border.primary};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  background: ${({ theme }) => theme.colors.surface.elevated};
+  color: ${({ theme }) => theme.colors.text.primary};
+  font-size: ${({ theme }) => theme.typography.sizes.sm};
+  min-width: 250px;
+  
+  &:focus {
+    outline: none;
+    border-color: ${({ theme }) => theme.colors.accent.primary};
+    box-shadow: 0 0 0 2px ${({ theme }) => theme.colors.accent.muted};
+  }
   
   &::placeholder {
-    color: ${({ theme }) => theme.colors.gray[500]};
+    color: ${({ theme }) => theme.colors.text.secondary};
   }
 `;
 
-const CrewTable = styled.table`
-  width: 100%;
+const FilterSelect = styled.select`
+  padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.md};
+  border: 1px solid ${({ theme }) => theme.colors.border.primary};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+  background: ${({ theme }) => theme.colors.surface.elevated};
+  color: ${({ theme }) => theme.colors.text.primary};
+  font-size: ${({ theme }) => theme.typography.sizes.sm};
+  cursor: pointer;
   
-  th {
-    background: ${({ theme }) => theme.colors.gray[800]};
-    padding: ${({ theme }) => theme.spacing.md};
-    text-align: left;
-    font-weight: 600;
-    color: ${({ theme }) => theme.colors.gray[400]};
-    font-size: ${({ theme }) => theme.sizes.small};
-    text-transform: uppercase;
-    letter-spacing: 1px;
-  }
-  
-  td {
-    padding: ${({ theme }) => theme.spacing.md};
-    border-bottom: 1px solid ${({ theme }) => theme.colors.gray[800]};
-  }
-  
-  tr:hover td {
-    background: ${({ theme }) => theme.colors.gray[850]};
+  &:focus {
+    outline: none;
+    border-color: ${({ theme }) => theme.colors.accent.primary};
   }
 `;
 
-const Avatar = styled.div`
-  width: 40px;
-  height: 40px;
+const StatsBar = styled.div`
+  display: flex;
+  gap: ${({ theme }) => theme.spacing.lg};
+  padding: ${({ theme }) => theme.spacing.md} ${({ theme }) => theme.spacing.lg};
+  background: ${({ theme }) => theme.colors.surface.elevated};
+  border-radius: ${({ theme }) => theme.borderRadius.lg};
+  border: 1px solid ${({ theme }) => theme.colors.border.primary};
+`;
+
+const StatItem = styled.div`
+  text-align: center;
+`;
+
+const StatNumber = styled.div`
+  font-size: ${({ theme }) => theme.typography.sizes.xl};
+  font-weight: ${({ theme }) => theme.typography.weights.bold};
+  color: ${({ theme }) => theme.colors.accent.primary};
+`;
+
+const StatLabel = styled.div`
+  font-size: ${({ theme }) => theme.typography.sizes.xs};
+  color: ${({ theme }) => theme.colors.text.secondary};
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+`;
+
+const CrewGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: ${({ theme }) => theme.spacing.lg};
+`;
+
+const CrewCard = styled(Card)`
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: ${({ theme }) => theme.shadows.lg};
+  }
+`;
+
+const CrewCardHeader = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.spacing.md};
+  margin-bottom: ${({ theme }) => theme.spacing.md};
+`;
+
+const Avatar = styled.div<{ $status: string }>`
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
-  background: ${({ theme }) => theme.colors.accent.main};
+  background: ${({ theme, $status }) => 
+    $status === 'available' ? theme.colors.success.primary :
+    $status === 'on_set' ? theme.colors.warning.primary :
+    theme.colors.error.primary
+  };
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 600;
+  color: white;
+  font-weight: ${({ theme }) => theme.typography.weights.bold};
+  font-size: ${({ theme }) => theme.typography.sizes.sm};
+  position: relative;
+  
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: ${({ theme, $status }) => 
+      $status === 'available' ? theme.colors.success.primary :
+      $status === 'on_set' ? theme.colors.warning.primary :
+      theme.colors.error.primary
+    };
+    border: 2px solid ${({ theme }) => theme.colors.surface.primary};
+  }
 `;
 
-const NameCell = styled.div`
+const CrewInfo = styled.div`
+  flex: 1;
+`;
+
+const CrewName = styled.h3`
+  font-size: ${({ theme }) => theme.typography.sizes.md};
+  font-weight: ${({ theme }) => theme.typography.weights.semibold};
+  color: ${({ theme }) => theme.colors.text.primary};
+  margin: 0 0 ${({ theme }) => theme.spacing.xs} 0;
+`;
+
+const CrewRole = styled.div`
+  font-size: ${({ theme }) => theme.typography.sizes.sm};
+  color: ${({ theme }) => theme.colors.text.secondary};
+`;
+
+const CrewDetails = styled.div`
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: ${({ theme }) => theme.spacing.sm};
 `;
 
-const StatusBadge = styled.span<{ status: 'available' | 'on_set' | 'off' }>`
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-size: ${({ theme }) => theme.sizes.small};
-  background: ${({ theme, status }) => {
-    switch(status) {
-      case 'available': return theme.colors.status.success + '20';
-      case 'on_set': return theme.colors.accent.main + '20';
-      case 'off': return theme.colors.gray[700];
-    }
-  }};
-  color: ${({ theme, status }) => {
-    switch(status) {
-      case 'available': return theme.colors.status.success;
-      case 'on_set': return theme.colors.accent.main;
-      case 'off': return theme.colors.gray[500];
-    }
-  }};
-  
-  &::before {
-    content: '';
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: currentColor;
-  }
-`;
-
-const AddButton = styled.button`
-  background: ${({ theme }) => theme.colors.accent.main};
-  color: ${({ theme }) => theme.colors.primary.light};
-  border: none;
-  padding: ${({ theme }) => theme.spacing.sm} ${({ theme }) => theme.spacing.lg};
-  border-radius: 8px;
-  font-weight: 500;
-  cursor: pointer;
+const DetailRow = styled.div`
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: ${({ theme }) => theme.spacing.xs};
-  
-  &:hover {
-    background: ${({ theme }) => theme.colors.accent.muted};
-  }
+  font-size: ${({ theme }) => theme.typography.sizes.sm};
 `;
 
-export const CrewList: React.FC = () => {
-  const [search, setSearch] = useState('');
+const DetailLabel = styled.span`
+  color: ${({ theme }) => theme.colors.text.secondary};
+`;
 
-  // Mock data
-  const crewMembers = [
-    {
-      id: '1',
-      name: 'John Doe',
-      role: 'Director',
-      department: 'Direction',
-      phone: '+1 234 567 890',
-      status: 'on_set',
-      dailyRate: '$1,200',
-      initials: 'JD'
-    },
-    {
-      id: '2',
-      name: 'Jane Smith',
-      role: 'Director of Photography',
-      department: 'Camera',
-      phone: '+1 234 567 891',
-      status: 'on_set',
-      dailyRate: '$1,000',
-      initials: 'JS'
-    },
-    {
-      id: '3',
-      name: 'Mike Wilson',
-      role: 'Sound Mixer',
-      department: 'Sound',
-      phone: '+1 234 567 892',
-      status: 'available',
-      dailyRate: '$800',
-      initials: 'MW'
-    },
-    {
-      id: '4',
-      name: 'Sarah Johnson',
-      role: '1st Assistant Director',
-      department: 'Direction',
-      phone: '+1 234 567 893',
-      status: 'on_set',
-      dailyRate: '$900',
-      initials: 'SJ'
-    },
-    {
-      id: '5',
-      name: 'Tom Brown',
-      role: 'Gaffer',
-      department: 'Lighting',
-      phone: '+1 234 567 894',
-      status: 'off',
-      dailyRate: '$750',
-      initials: 'TB'
-    },
-  ];
+const DetailValue = styled.span`
+  color: ${({ theme }) => theme.colors.text.primary};
+  font-weight: ${({ theme }) => theme.typography.weights.medium};
+`;
 
-  const filteredCrew = crewMembers.filter(member =>
-    member.name.toLowerCase().includes(search.toLowerCase()) ||
-    member.role.toLowerCase().includes(search.toLowerCase()) ||
-    member.department.toLowerCase().includes(search.toLowerCase())
-  );
+const StatusBadge = styled.span<{ $status: string }>`
+  padding: ${({ theme }) => theme.spacing.xs} ${({ theme }) => theme.spacing.sm};
+  border-radius: ${({ theme }) => theme.borderRadius.sm};
+  font-size: ${({ theme }) => theme.typography.sizes.xs};
+  font-weight: ${({ theme }) => theme.typography.weights.medium};
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: ${({ theme, $status }) => 
+    $status === 'available' ? theme.colors.success.muted :
+    $status === 'on_set' ? theme.colors.warning.muted :
+    theme.colors.error.muted
+  };
+  color: ${({ theme, $status }) => 
+    $status === 'available' ? theme.colors.success.primary :
+    $status === 'on_set' ? theme.colors.warning.primary :
+    theme.colors.error.primary
+  };
+`;
+
+const LoadingState = styled.div`
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  color: ${({ theme }) => theme.colors.text.secondary};
+`;
+
+const ErrorState = styled.div`
+  padding: ${({ theme }) => theme.spacing.lg};
+  text-align: center;
+  color: ${({ theme }) => theme.colors.error.primary};
+  background: ${({ theme }) => theme.colors.error.muted};
+  border-radius: ${({ theme }) => theme.borderRadius.md};
+`;
+
+interface Props {
+  onCrewSelect?: (crewId: string) => void;
+  onAddCrew?: () => void;
+}
+
+export const CrewList: React.FC<Props> = ({ onCrewSelect, onAddCrew }) => {
+  const {
+    crew,
+    departments,
+    stats,
+    loading,
+    error,
+    filters,
+    setFilters,
+    refresh
+  } = useCrew();
+
+  const [localSearch, setLocalSearch] = useState('');
+
+  // Update filters with debouncing
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setFilters(prev => ({ ...prev, search: localSearch }));
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }, [localSearch, setFilters]);
+
+  const getCrewStatus = (member: any) => {
+    return member.is_available ? 'available' : 'on_set';
+  };
+
+  const getCrewInitials = (member: any) => {
+    return `${member.first_name?.[0] || ''}${member.last_name?.[0] || ''}`.toUpperCase();
+  };
+
+  const formatStatusText = (status: string) => {
+    const statusMap = {
+      'available': 'Available',
+      'on_set': 'On Set',
+      'off': 'Off Duty',
+      'unavailable': 'Unavailable'
+    };
+    return statusMap[status as keyof typeof statusMap] || status;
+  };
+
+  if (loading && crew.length === 0) {
+    return <LoadingState>Loading crew...</LoadingState>;
+  }
+
+  if (error) {
+    return (
+      <ErrorState>
+        <h3>Error loading crew</h3>
+        <p>{error}</p>
+        <Button onClick={refresh} variant="secondary" size="sm">
+          Try Again
+        </Button>
+      </ErrorState>
+    );
+  }
 
   return (
-    <CrewContainer>
-      <CrewHeader>
-        <h3>Crew Management</h3>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <SearchBar
+    <Container>
+      <Header>
+        <Title>Crew Management</Title>
+        <Controls>
+          <SearchInput
             type="text"
-            placeholder="Search crew..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search crew members..."
+            value={localSearch}
+            onChange={(e) => setLocalSearch(e.target.value)}
           />
-          <AddButton>
-            <span>+</span> Add Crew Member
-          </AddButton>
-        </div>
-      </CrewHeader>
-      
-      <CrewTable>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Role</th>
-            <th>Department</th>
-            <th>Phone</th>
-            <th>Status</th>
-            <th>Daily Rate</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {filteredCrew.map(member => (
-            <tr key={member.id}>
-              <td>
-                <NameCell>
-                  <Avatar>{member.initials}</Avatar>
-                  {member.name}
-                </NameCell>
-              </td>
-              <td>{member.role}</td>
-              <td>{member.department}</td>
-              <td>{member.phone}</td>
-              <td>
-                <StatusBadge status={member.status as any}>
-                  {member.status.replace('_', ' ')}
+          <FilterSelect
+            value={filters.department || ''}
+            onChange={(e) => setFilters(prev => ({ ...prev, department: e.target.value || undefined }))}
+          >
+            <option value="">All Departments</option>
+            {departments.map(dept => (
+              <option key={dept.id} value={dept.name}>
+                {dept.name}
+              </option>
+            ))}
+          </FilterSelect>
+          <FilterSelect
+            value={filters.status || ''}
+            onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value as any || undefined }))}
+          >
+            <option value="">All Status</option>
+            <option value="available">Available</option>
+            <option value="on_set">On Set</option>
+            <option value="off">Off Duty</option>
+            <option value="unavailable">Unavailable</option>
+          </FilterSelect>
+          {onAddCrew && (
+            <Button onClick={onAddCrew} variant="primary">
+              Add Crew Member
+            </Button>
+          )}
+        </Controls>
+      </Header>
+
+      <StatsBar>
+        <StatItem>
+          <StatNumber>{stats.total}</StatNumber>
+          <StatLabel>Total Crew</StatLabel>
+        </StatItem>
+        <StatItem>
+          <StatNumber>{stats.available}</StatNumber>
+          <StatLabel>Available</StatLabel>
+        </StatItem>
+        <StatItem>
+          <StatNumber>{stats.onSet}</StatNumber>
+          <StatLabel>On Set</StatLabel>
+        </StatItem>
+        <StatItem>
+          <StatNumber>{stats.departments}</StatNumber>
+          <StatLabel>Departments</StatLabel>
+        </StatItem>
+      </StatsBar>
+
+      <CrewGrid>
+        {crew.map(member => {
+          const status = getCrewStatus(member);
+          const initials = getCrewInitials(member);
+          
+          return (
+            <CrewCard
+              key={member.id}
+              onClick={() => onCrewSelect?.(member.id.toString())}
+            >
+              <CrewCardHeader>
+                <Avatar $status={status}>
+                  {initials}
+                </Avatar>
+                <CrewInfo>
+                  <CrewName>
+                    {member.first_name} {member.last_name}
+                  </CrewName>
+                  <CrewRole>
+                    {member.primary_position?.title || 'No position assigned'}
+                  </CrewRole>
+                </CrewInfo>
+                <StatusBadge $status={status}>
+                  {formatStatusText(status)}
                 </StatusBadge>
-              </td>
-              <td>{member.dailyRate}</td>
-              <td>
-                <button>Edit</button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </CrewTable>
-    </CrewContainer>
+              </CrewCardHeader>
+              
+              <CrewDetails>
+                <DetailRow>
+                  <DetailLabel>Department:</DetailLabel>
+                  <DetailValue>
+                    {member.primary_position?.department?.name || 'Unassigned'}
+                  </DetailValue>
+                </DetailRow>
+                <DetailRow>
+                  <DetailLabel>Phone:</DetailLabel>
+                  <DetailValue>{member.phone_primary || 'N/A'}</DetailValue>
+                </DetailRow>
+                <DetailRow>
+                  <DetailLabel>Email:</DetailLabel>
+                  <DetailValue>{member.email}</DetailValue>
+                </DetailRow>
+                {member.emergency_contact && (
+                  <DetailRow>
+                    <DetailLabel>Emergency:</DetailLabel>
+                    <DetailValue>{member.emergency_contact}</DetailValue>
+                  </DetailRow>
+                )}
+              </CrewDetails>
+            </CrewCard>
+          );
+        })}
+      </CrewGrid>
+
+      {crew.length === 0 && !loading && (
+        <LoadingState>
+          {filters.search || filters.department || filters.status 
+            ? 'No crew members match your filters'
+            : 'No crew members found'
+          }
+        </LoadingState>
+      )}
+    </Container>
   );
 };

@@ -1,8 +1,1 @@
-export {
-  Button,
-  PrimaryButton,
-  SecondaryButton,
-  DangerButton,
-  OutlineButton,
-  GhostButton,
-} from './Button';
+export { Button } from './Button';

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import styled from 'styled-components';
-import { Card, GlassCard, CardHeader, CardContent } from '../../ui/Card';
-import { PrimaryButton, SecondaryButton, OutlineButton, DangerButton } from '../../ui/Button';
+import { Card } from '../../ui/Card';
+import { Button } from '../../ui/Button';
 
 interface DocumentVersion {
   id: string;
@@ -58,249 +58,157 @@ export function VersionControl({
   const getVersionNumber = (version: string) => {
     const parts = version.split('.');
     return {
-      major: parseInt(parts[0] || '1'),
-      minor: parseInt(parts[1] || '0')
+      major: parseInt(parts[0]) || 1,
+      minor: parseInt(parts[1]) || 0,
+      patch: parseInt(parts[2]) || 0
     };
   };
 
-  const generateNextVersion = (currentVersion: string, isMinor: boolean = true) => {
-    const { major, minor } = getVersionNumber(currentVersion);
-    if (isMinor) {
-      return `${major}.${minor + 1}`;
-    } else {
-      return `${major + 1}.0`;
-    }
-  };
-
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setNewVersionFile(e.target.files[0]);
+    const file = e.target.files?.[0];
+    if (file) {
+      setNewVersionFile(file);
     }
   };
 
-  const handleVersionUpload = async () => {
-    if (!newVersionFile || !changeLog.trim() || !onVersionUpload) return;
+  const handleUploadSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newVersionFile || !onVersionUpload) return;
 
     setUploading(true);
     try {
-      await onVersionUpload(document.id, newVersionFile, changeLog.trim());
+      await onVersionUpload(document.id, newVersionFile, changeLog);
+      setShowUploadForm(false);
       setNewVersionFile(null);
       setChangeLog('');
-      setShowUploadForm(false);
     } catch (error) {
-      console.error('Version upload failed:', error);
-      alert('Nahrávání nové verze se nezdařilo');
+      console.error('Upload failed:', error);
     } finally {
       setUploading(false);
     }
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('cs-CZ');
-  };
-
-  const getStatusColor = (status: string) => {
-    const colors = {
-      draft: '#6B7280',
-      review: '#F59E0B',
-      approved: '#10B981',
-      final: '#3B82F6'
-    };
-    return colors[status as keyof typeof colors] || '#6B7280';
-  };
-
-  const getVersionBadgeColor = (version: DocumentVersion, isLatest: boolean) => {
-    if (isLatest) return '#10B981';
-    if (version.status === 'final') return '#3B82F6';
-    return '#6B7280';
+    return new Date(dateString).toLocaleDateString('cs-CZ', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   return (
     <VersionControlContainer>
-      {/* Header */}
-      <VersionHeader>
+      <VersionHeaderSection>
         <HeaderLeft>
           <BackButton onClick={onBackToViewer}>
             ← Zpět na dokument
           </BackButton>
           <DocumentTitleSection>
-            <DocumentTitle>Verze: {document.title}</DocumentTitle>
-            <CurrentVersion>
-              Aktuální verze: {document.version} • {sortedVersions.length} verzí celkem
-            </CurrentVersion>
+            <DocumentTitle>{document.title}</DocumentTitle>
+            <CurrentVersion>Aktuální verze: {document.version}</CurrentVersion>
           </DocumentTitleSection>
         </HeaderLeft>
-
+        
         <HeaderActions>
           {canUploadVersion && (
-            <PrimaryButton 
-              onClick={() => setShowUploadForm(true)}
-              disabled={showUploadForm}
-            >
+            <Button onClick={() => setShowUploadForm(!showUploadForm)}>
               📤 Nahrát novou verzi
-            </PrimaryButton>
+            </Button>
           )}
         </HeaderActions>
-      </VersionHeader>
+      </VersionHeaderSection>
 
       <VersionContent>
-        {/* Upload Form */}
         {showUploadForm && (
           <UploadVersionForm>
-            <GlassCard>
-              <CardHeader>
-                <UploadFormHeader>
-                  <h4>Nahrát novou verzi</h4>
-                  <CloseButton onClick={() => setShowUploadForm(false)}>✕</CloseButton>
-                </UploadFormHeader>
-              </CardHeader>
-              <CardContent>
-                <UploadForm>
-                  <FormGroup>
-                    <FormLabel>Nová verze souboru</FormLabel>
-                    <FileInput>
-                      <input
-                        type="file"
-                        onChange={handleFileSelect}
-                        accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif,.mp4,.mov,.avi"
-                      />
-                      {newVersionFile && (
-                        <SelectedFileInfo>
-                          📄 {newVersionFile.name} ({formatFileSize(newVersionFile.size)})
-                        </SelectedFileInfo>
-                      )}
-                    </FileInput>
-                  </FormGroup>
-
-                  <FormGroup>
-                    <FormLabel>Popis změn *</FormLabel>
-                    <ChangeLogTextarea
-                      value={changeLog}
-                      onChange={(e) => setChangeLog(e.target.value)}
-                      placeholder="Popište co se v této verzi změnilo..."
-                      rows={4}
-                      required
-                    />
-                  </FormGroup>
-
-                  <VersionPreview>
-                    <PreviewLabel>Nová verze bude:</PreviewLabel>
-                    <NewVersionBadge>
-                      v{generateNextVersion(document.version)}
-                    </NewVersionBadge>
-                  </VersionPreview>
-
-                  <FormActions>
-                    <OutlineButton onClick={() => setShowUploadForm(false)}>
-                      Zrušit
-                    </OutlineButton>
-                    <PrimaryButton 
-                      onClick={handleVersionUpload}
-                      disabled={!newVersionFile || !changeLog.trim() || uploading}
-                    >
-                      {uploading ? '📤 Nahrávám...' : '📤 Nahrát verzi'}
-                    </PrimaryButton>
-                  </FormActions>
-                </UploadForm>
-              </CardContent>
-            </GlassCard>
+            <UploadFormHeader>
+              <h3>Nahrát novou verzi</h3>
+            </UploadFormHeader>
+            
+            <form onSubmit={handleUploadSubmit}>
+              <FormGroup>
+                <label>Soubor:</label>
+                <input
+                  type="file"
+                  onChange={handleFileSelect}
+                  required
+                  accept=".pdf,.doc,.docx,.txt"
+                />
+              </FormGroup>
+              
+              <FormGroup>
+                <label>Popis změn:</label>
+                <textarea
+                  value={changeLog}
+                  onChange={(e) => setChangeLog(e.target.value)}
+                  placeholder="Popište co se v této verzi změnilo..."
+                  required
+                  rows={3}
+                />
+              </FormGroup>
+              
+              <FormActions>
+                <Button type="button" onClick={() => setShowUploadForm(false)}>
+                  Zrušit
+                </Button>
+                <Button type="submit" disabled={!newVersionFile || uploading}>
+                  {uploading ? 'Nahrávám...' : 'Nahrát verzi'}
+                </Button>
+              </FormActions>
+            </form>
           </UploadVersionForm>
         )}
 
-        {/* Versions List */}
         <VersionsList>
-          <GlassCard>
+          <Card>
             <CardHeader>
-              <h4>Historie verzí</h4>
+              <h3>Historie verzí</h3>
+              <p>{sortedVersions.length} verzí</p>
             </CardHeader>
+            
             <CardContent>
-              <VersionsTimeline>
-                {sortedVersions.map((version, index) => {
-                  const isLatest = index === 0;
-                  const isCurrent = version.version === document.version;
-                  
-                  return (
-                    <VersionItem key={version.id} $isLatest={isLatest} $isCurrent={isCurrent}>
-                      <VersionItemLeft>
-                        <VersionBadge $color={getVersionBadgeColor(version, isLatest)}>
-                          v{version.version}
-                          {isLatest && <LatestLabel>NEJNOVĚJŠÍ</LatestLabel>}
-                          {isCurrent && <CurrentLabel>AKTUÁLNÍ</CurrentLabel>}
-                        </VersionBadge>
-                        
-                        <VersionTimeline>
-                          <TimelineDot $color={getVersionBadgeColor(version, isLatest)} />
-                          {index < sortedVersions.length - 1 && <TimelineLine />}
-                        </VersionTimeline>
-                      </VersionItemLeft>
-
-                      <VersionItemContent>
-                        <VersionHeader>
-                          <VersionTitle>{version.filename}</VersionTitle>
-                          <VersionMeta>
-                            <StatusBadge $color={getStatusColor(version.status)}>
-                              {version.status}
-                            </StatusBadge>
-                            <SizeInfo>{formatFileSize(version.size)}</SizeInfo>
-                          </VersionMeta>
-                        </VersionHeader>
-
-                        <VersionInfo>
-                          <InfoRow>
-                            <InfoIcon>👤</InfoIcon>
-                            <InfoText>{version.uploadedBy}</InfoText>
-                          </InfoRow>
-                          <InfoRow>
-                            <InfoIcon>📅</InfoIcon>
-                            <InfoText>{formatDate(version.uploadedAt)}</InfoText>
-                          </InfoRow>
-                        </VersionInfo>
-
+              {sortedVersions.length > 0 ? (
+                sortedVersions.map((version) => (
+                  <VersionItem key={version.id}>
+                    <VersionInfo>
+                      <VersionNumber>v{version.version}</VersionNumber>
+                      <VersionDetails>
+                        <div>
+                          <strong>{version.filename}</strong>
+                          <span> • {formatFileSize(version.size)}</span>
+                        </div>
+                        <VersionMeta>
+                          {formatDate(version.uploadedAt)} • {version.uploadedBy}
+                        </VersionMeta>
                         {version.changeLog && (
-                          <ChangeLogSection>
-                            <ChangeLogLabel>Změny v této verzi:</ChangeLogLabel>
-                            <ChangeLogText>{version.changeLog}</ChangeLogText>
-                          </ChangeLogSection>
+                          <ChangeLog>{version.changeLog}</ChangeLog>
                         )}
-
-                        <VersionActions>
-                          <SecondaryButton size="sm">
-                            👁️ Zobrazit
-                          </SecondaryButton>
-                          
-                          <SecondaryButton size="sm">
-                            💾 Stáhnout
-                          </SecondaryButton>
-                          
-                          {!isCurrent && canUploadVersion && (
-                            <OutlineButton size="sm">
-                              🔄 Obnovit na tuto verzi
-                            </OutlineButton>
-                          )}
-                          
-                          {index > 0 && (
-                            <OutlineButton size="sm">
-                              ⚖️ Porovnat s předchozí
-                            </OutlineButton>
-                          )}
-                        </VersionActions>
-                      </VersionItemContent>
-                    </VersionItem>
-                  );
-                })}
-              </VersionsTimeline>
-
-              {sortedVersions.length === 0 && (
+                      </VersionDetails>
+                    </VersionInfo>
+                    
+                    <VersionStatus $status={version.status}>
+                      {version.status}
+                    </VersionStatus>
+                    
+                    <VersionActions>
+                      <Button size="sm">📥 Stáhnout</Button>
+                      <Button size="sm">👁️ Zobrazit</Button>
+                    </VersionActions>
+                  </VersionItem>
+                ))
+              ) : (
                 <EmptyVersions>
-                  <EmptyIcon>📚</EmptyIcon>
+                  <EmptyIcon>📄</EmptyIcon>
                   <EmptyTitle>Žádné verze</EmptyTitle>
                   <EmptyDescription>
-                    Zatím nebyly nahrány žádné verze tohoto dokumentu.
+                    Tento dokument zatím nemá žádné verze.
                   </EmptyDescription>
                 </EmptyVersions>
               )}
             </CardContent>
-          </GlassCard>
+          </Card>
         </VersionsList>
       </VersionContent>
     </VersionControlContainer>
@@ -311,18 +219,18 @@ export function VersionControl({
 const VersionControlContainer = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${props => props.theme.spacing.xl};
+  gap: 2rem;
   height: 100%;
 `;
 
-const VersionHeader = styled.div`
+const VersionHeaderSection = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: ${props => props.theme.spacing.lg};
-  padding: ${props => props.theme.spacing.lg};
-  border-bottom: 1px solid ${props => props.theme.colors.border};
-  background: ${props => props.theme.colors.surface};
+  gap: 1.5rem;
+  padding: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
   
   @media (max-width: 768px) {
     flex-direction: column;
@@ -333,23 +241,23 @@ const VersionHeader = styled.div`
 const HeaderLeft = styled.div`
   display: flex;
   align-items: center;
-  gap: ${props => props.theme.spacing.lg};
+  gap: 1.5rem;
   flex: 1;
   min-width: 0;
 `;
 
 const BackButton = styled.button`
-  padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.md};
-  border: 1px solid ${props => props.theme.colors.border};
-  background: ${props => props.theme.colors.background};
-  color: ${props => props.theme.colors.text};
-  border-radius: ${props => props.theme.borderRadius.md};
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all ${props => props.theme.transitions.fast};
+  transition: all 0.2s;
   white-space: nowrap;
   
   &:hover {
-    background: ${props => props.theme.colors.surface};
+    background: rgba(255, 255, 255, 0.1);
   }
 `;
 
@@ -359,354 +267,214 @@ const DocumentTitleSection = styled.div`
 `;
 
 const DocumentTitle = styled.h2`
-  margin: 0 0 ${props => props.theme.spacing.xs} 0;
-  color: ${props => props.theme.colors.text};
+  margin: 0 0 0.5rem 0;
+  color: #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 `;
 
 const CurrentVersion = styled.div`
-  font-size: ${props => props.theme.typography.fontSize.sm};
-  color: ${props => props.theme.colors.textSecondary};
+  font-size: 0.875rem;
+  color: #8b8b8b;
 `;
 
 const HeaderActions = styled.div`
   display: flex;
-  gap: ${props => props.theme.spacing.md};
+  gap: 1rem;
 `;
 
 const VersionContent = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${props => props.theme.spacing.xl};
+  gap: 2rem;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: ${props => props.theme.spacing.lg};
+  padding: 0 1.5rem 1.5rem;
 `;
 
-const UploadVersionForm = styled.div``;
+const UploadVersionForm = styled.div`
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 1.5rem;
+`;
 
 const UploadFormHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-`;
-
-const CloseButton = styled.button`
-  background: none;
-  border: none;
-  font-size: ${props => props.theme.typography.fontSize.xl};
-  color: ${props => props.theme.colors.textSecondary};
-  cursor: pointer;
-  padding: ${props => props.theme.spacing.xs};
-  border-radius: ${props => props.theme.borderRadius.sm};
+  margin-bottom: 1.5rem;
   
-  &:hover {
-    background: ${props => props.theme.colors.background};
-    color: ${props => props.theme.colors.text};
+  h3 {
+    margin: 0;
+    color: #fff;
   }
-`;
-
-const UploadForm = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${props => props.theme.spacing.lg};
 `;
 
 const FormGroup = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${props => props.theme.spacing.sm};
-`;
-
-const FormLabel = styled.label`
-  font-weight: ${props => props.theme.typography.fontWeight.medium};
-  color: ${props => props.theme.colors.text};
-  font-size: ${props => props.theme.typography.fontSize.sm};
-`;
-
-const FileInput = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${props => props.theme.spacing.sm};
+  margin-bottom: 1rem;
   
-  input[type="file"] {
-    padding: ${props => props.theme.spacing.md};
-    border: 1px solid ${props => props.theme.colors.border};
-    border-radius: ${props => props.theme.borderRadius.md};
-    background: ${props => props.theme.colors.background};
-    color: ${props => props.theme.colors.text};
+  label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: #fff;
+    font-size: 0.875rem;
   }
-`;
-
-const SelectedFileInfo = styled.div`
-  padding: ${props => props.theme.spacing.sm};
-  background: ${props => props.theme.colors.success}10;
-  border: 1px solid ${props => props.theme.colors.success}30;
-  border-radius: ${props => props.theme.borderRadius.md};
-  color: ${props => props.theme.colors.success};
-  font-size: ${props => props.theme.typography.fontSize.sm};
-`;
-
-const ChangeLogTextarea = styled.textarea`
-  padding: ${props => props.theme.spacing.md};
-  border: 1px solid ${props => props.theme.colors.border};
-  border-radius: ${props => props.theme.borderRadius.md};
-  background: ${props => props.theme.colors.background};
-  color: ${props => props.theme.colors.text};
-  font-family: inherit;
-  resize: vertical;
   
-  &:focus {
-    outline: none;
-    border-color: ${props => props.theme.colors.primary};
+  input, textarea {
+    width: 100%;
+    padding: 0.75rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    color: #fff;
+    font-family: inherit;
+    
+    &:focus {
+      outline: none;
+      border-color: rgba(103, 126, 234, 0.4);
+    }
   }
-`;
-
-const VersionPreview = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${props => props.theme.spacing.md};
-  padding: ${props => props.theme.spacing.md};
-  background: ${props => props.theme.colors.background};
-  border-radius: ${props => props.theme.borderRadius.md};
-`;
-
-const PreviewLabel = styled.span`
-  color: ${props => props.theme.colors.textSecondary};
-  font-size: ${props => props.theme.typography.fontSize.sm};
-`;
-
-const NewVersionBadge = styled.span`
-  padding: 4px 12px;
-  background: ${props => props.theme.colors.primary};
-  color: white;
-  border-radius: ${props => props.theme.borderRadius.md};
-  font-weight: ${props => props.theme.typography.fontWeight.semibold};
-  font-size: ${props => props.theme.typography.fontSize.sm};
+  
+  textarea {
+    resize: vertical;
+    min-height: 80px;
+  }
 `;
 
 const FormActions = styled.div`
   display: flex;
-  gap: ${props => props.theme.spacing.md};
+  gap: 1rem;
   justify-content: flex-end;
-  border-top: 1px solid ${props => props.theme.colors.border};
-  padding-top: ${props => props.theme.spacing.lg};
+  margin-top: 1.5rem;
 `;
 
-const VersionsList = styled.div``;
-
-const VersionsTimeline = styled.div`
-  display: flex;
-  flex-direction: column;
+const VersionsList = styled.div`
+  flex: 1;
 `;
 
-const VersionItem = styled.div<{ $isLatest: boolean; $isCurrent: boolean }>`
-  display: flex;
-  gap: ${props => props.theme.spacing.lg};
-  padding: ${props => props.theme.spacing.lg};
-  border-radius: ${props => props.theme.borderRadius.lg};
-  background: ${props => {
-    if (props.$isLatest) return `${props.theme.colors.success}05`;
-    if (props.$isCurrent) return `${props.theme.colors.primary}05`;
-    return 'transparent';
-  }};
-  border: 1px solid ${props => {
-    if (props.$isLatest) return `${props.theme.colors.success}20`;
-    if (props.$isCurrent) return `${props.theme.colors.primary}20`;
-    return 'transparent';
-  }};
-  margin-bottom: ${props => props.theme.spacing.md};
-  transition: all ${props => props.theme.transitions.fast};
-
-  &:hover {
-    background: ${props => props.theme.colors.background};
-    border-color: ${props => props.theme.colors.border};
+const CardHeader = styled.div`
+  padding: 1.5rem 1.5rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  
+  h3 {
+    margin: 0 0 0.25rem 0;
+    color: #fff;
+  }
+  
+  p {
+    margin: 0;
+    color: #8b8b8b;
+    font-size: 0.875rem;
   }
 `;
 
-const VersionItemLeft = styled.div`
+const CardContent = styled.div`
+  padding: 1.5rem;
+`;
+
+const VersionItem = styled.div`
   display: flex;
-  flex-direction: column;
   align-items: center;
-  position: relative;
-`;
-
-const VersionBadge = styled.div<{ $color: string }>`
-  position: relative;
-  padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.md};
-  background: ${props => props.$color};
-  color: white;
-  border-radius: ${props => props.theme.borderRadius.lg};
-  font-weight: ${props => props.theme.typography.fontWeight.bold};
-  font-size: ${props => props.theme.typography.fontSize.sm};
-  text-align: center;
-  min-width: 80px;
-  box-shadow: ${props => props.theme.shadows.md};
-`;
-
-const LatestLabel = styled.div`
-  position: absolute;
-  top: -8px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: ${props => props.theme.colors.success};
-  color: white;
-  padding: 2px 6px;
-  border-radius: ${props => props.theme.borderRadius.sm};
-  font-size: ${props => props.theme.typography.fontSize.xs};
-  font-weight: ${props => props.theme.typography.fontWeight.bold};
-  white-space: nowrap;
-`;
-
-const CurrentLabel = styled.div`
-  position: absolute;
-  top: -8px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: ${props => props.theme.colors.primary};
-  color: white;
-  padding: 2px 6px;
-  border-radius: ${props => props.theme.borderRadius.sm};
-  font-size: ${props => props.theme.typography.fontSize.xs};
-  font-weight: ${props => props.theme.typography.fontWeight.bold};
-  white-space: nowrap;
-`;
-
-const VersionTimeline = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  position: relative;
-  margin-top: ${props => props.theme.spacing.md};
-`;
-
-const TimelineDot = styled.div<{ $color: string }>`
-  width: 12px;
-  height: 12px;
-  background: ${props => props.$color};
-  border: 3px solid white;
-  border-radius: 50%;
-  box-shadow: ${props => props.theme.shadows.sm};
-`;
-
-const TimelineLine = styled.div`
-  width: 2px;
-  height: 60px;
-  background: ${props => props.theme.colors.border};
-  margin-top: ${props => props.theme.spacing.sm};
-`;
-
-const VersionItemContent = styled.div`
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: ${props => props.theme.spacing.md};
-`;
-
-const VersionHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: ${props => props.theme.spacing.md};
-`;
-
-const VersionTitle = styled.h4`
-  margin: 0;
-  color: ${props => props.theme.colors.text};
-  font-family: monospace;
-`;
-
-const VersionMeta = styled.div`
-  display: flex;
-  gap: ${props => props.theme.spacing.sm};
-  align-items: center;
-`;
-
-const StatusBadge = styled.span<{ $color: string }>`
-  padding: 2px 8px;
-  border-radius: ${props => props.theme.borderRadius.md};
-  background: ${props => props.$color}20;
-  color: ${props => props.$color};
-  font-size: ${props => props.theme.typography.fontSize.xs};
-  font-weight: ${props => props.theme.typography.fontWeight.medium};
-  text-transform: capitalize;
-`;
-
-const SizeInfo = styled.span`
-  font-size: ${props => props.theme.typography.fontSize.sm};
-  color: ${props => props.theme.colors.textSecondary};
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  margin-bottom: 0.75rem;
+  
+  &:last-child {
+    margin-bottom: 0;
+  }
 `;
 
 const VersionInfo = styled.div`
   display: flex;
-  gap: ${props => props.theme.spacing.lg};
-`;
-
-const InfoRow = styled.div`
-  display: flex;
   align-items: center;
-  gap: ${props => props.theme.spacing.xs};
+  gap: 1rem;
+  flex: 1;
+  min-width: 0;
 `;
 
-const InfoIcon = styled.span`
-  font-size: ${props => props.theme.typography.fontSize.sm};
+const VersionNumber = styled.div`
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  background: rgba(103, 126, 234, 0.2);
+  color: #667eea;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
 `;
 
-const InfoText = styled.span`
-  font-size: ${props => props.theme.typography.fontSize.sm};
-  color: ${props => props.theme.colors.textSecondary};
+const VersionDetails = styled.div`
+  flex: 1;
+  min-width: 0;
 `;
 
-const ChangeLogSection = styled.div`
-  padding: ${props => props.theme.spacing.md};
-  background: ${props => props.theme.colors.background};
-  border-radius: ${props => props.theme.borderRadius.md};
-  border-left: 3px solid ${props => props.theme.colors.primary};
+const VersionMeta = styled.div`
+  color: #8b8b8b;
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
 `;
 
-const ChangeLogLabel = styled.div`
-  font-weight: ${props => props.theme.typography.fontWeight.medium};
-  color: ${props => props.theme.colors.text};
-  font-size: ${props => props.theme.typography.fontSize.sm};
-  margin-bottom: ${props => props.theme.spacing.xs};
+const ChangeLog = styled.div`
+  color: #8b8b8b;
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+  font-style: italic;
 `;
 
-const ChangeLogText = styled.p`
-  margin: 0;
-  color: ${props => props.theme.colors.textSecondary};
-  font-size: ${props => props.theme.typography.fontSize.sm};
-  line-height: 1.4;
+const VersionStatus = styled.div<{ $status: string }>`
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.625rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  white-space: nowrap;
+  background: ${props => {
+    switch (props.$status) {
+      case 'final': return 'rgba(34, 197, 94, 0.2)';
+      case 'approved': return 'rgba(59, 130, 246, 0.2)';
+      case 'review': return 'rgba(245, 158, 11, 0.2)';
+      case 'draft': return 'rgba(156, 163, 175, 0.2)';
+      default: return 'rgba(156, 163, 175, 0.2)';
+    }
+  }};
+  color: ${props => {
+    switch (props.$status) {
+      case 'final': return '#22c55e';
+      case 'approved': return '#3b82f6';
+      case 'review': return '#f59e0b';
+      case 'draft': return '#9ca3af';
+      default: return '#9ca3af';
+    }
+  }};
 `;
 
 const VersionActions = styled.div`
   display: flex;
-  gap: ${props => props.theme.spacing.sm};
-  flex-wrap: wrap;
+  gap: 0.5rem;
 `;
 
 const EmptyVersions = styled.div`
   text-align: center;
-  padding: ${props => props.theme.spacing['4xl']};
-  color: ${props => props.theme.colors.textSecondary};
+  padding: 3rem 1rem;
+  color: #8b8b8b;
 `;
 
 const EmptyIcon = styled.div`
-  font-size: ${props => props.theme.typography.fontSize['3xl']};
-  margin-bottom: ${props => props.theme.spacing.lg};
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
 `;
 
-const EmptyTitle = styled.h3`
-  margin: 0 0 ${props => props.theme.spacing.sm} 0;
-  color: ${props => props.theme.colors.text};
+const EmptyTitle = styled.h4`
+  margin: 0 0 0.5rem 0;
+  color: #8b8b8b;
 `;
 
 const EmptyDescription = styled.p`
   margin: 0;
-  max-width: 400px;
-  margin-left: auto;
-  margin-right: auto;
+  font-size: 0.875rem;
 `;
+
+export default VersionControl;

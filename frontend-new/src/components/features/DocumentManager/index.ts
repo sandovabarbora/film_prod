@@ -1,4 +1,3 @@
-// DocumentManager barrel exports
 export { DocumentManager } from './DocumentManager';
 export { DocumentSearch } from './DocumentSearch';
 export { DocumentList } from './DocumentList';

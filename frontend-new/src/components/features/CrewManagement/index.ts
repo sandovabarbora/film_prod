@@ -1,2 +1,4 @@
 export { CrewList } from './CrewList';
-export { default as CrewAssignmentModal } from './CrewAssignmentModal';
+export { CrewAssignmentModal } from './CrewAssignmentModal';
+export { default as CrewSelector } from './CrewSelector';
+export { default as CrewAddModal } from './CrewAddModal';

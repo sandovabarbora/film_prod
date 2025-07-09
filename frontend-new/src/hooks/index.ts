@@ -1,3 +1,2 @@
-// All hooks barrel exports
-export * from './useProjects';
-export * from './features';
+// src/hooks/index.ts - Hook exports
+export { default as useCrew } from './useCrew';

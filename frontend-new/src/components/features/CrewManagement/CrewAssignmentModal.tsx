@@ -1,758 +1,658 @@
+// src/components/features/CrewManagement/CrewAssignmentModal.tsx - WITH API PROJECTS + POSITIONS
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { X, Save, User, Briefcase, Calendar, DollarSign, Search, Star } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, Users, Calendar, DollarSign, FileText, MapPin, FolderOpen } from 'lucide-react';
+import type { DepartmentWithPositions } from '../../../types/crew';
+import crewService from '../../../services/crewService';
+import projectService from '../../../services/projectService';
+import Button from '../../ui/Button';
 
-interface CrewMember {
-  id: number;
-  first_name: string;
-  last_name: string;
-  email: string;
-  phone_primary: string;
-  primary_position: {
-    id: number;
-    title: string;
-    department: {
-      id: number;
-      name: string;
-    };
-  };
-  is_available: boolean;
-  skills?: string[];
-  experience_years?: number;
-}
-
-interface CrewAssignmentFormData {
-  crew_member_id: number;
-  role: string;
-  start_date: string;
-  end_date: string;
-  daily_rate: number | string;
-  is_key_personnel: boolean;
-  notes: string;
-}
-
-// Rozšířený interface s edit support
 interface CrewAssignmentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: CrewAssignmentFormData) => Promise<void>;
-  projectId: number;
-  projectStartDate: string;
-  projectEndDate: string;
-  assignment?: any; // Editovaný assignment
-  isEditing?: boolean; // Edit mode flag
+  onAssign: (assignmentData: AssignmentData) => Promise<void>;
+  selectedCrewIds: string[];
+  title: string;
+  isProjectSpecific?: boolean;
+  currentProjectId?: string; // NEW - ID aktuálního projektu pokud jsme v project view
 }
 
-const ModalOverlay = styled.div<{ $isOpen: boolean }>`
+interface AssignmentData {
+  projectId?: string;
+  position: string;
+  positionId?: string;
+  departmentId?: string;
+  startDate: string;
+  endDate: string;
+  dailyRate?: number;
+  notes?: string;
+}
+
+interface Project {
+  id: string;
+  title: string;
+  status: string;
+  start_date?: string;
+  end_date?: string;
+}
+
+// Styled Components (same dark theme)
+const ModalOverlay = styled(motion.div)`
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.8);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: ${({ theme }) => theme.zIndex.modal};
-  opacity: ${({ $isOpen }) => $isOpen ? 1 : 0};
-  visibility: ${({ $isOpen }) => $isOpen ? 'visible' : 'hidden'};
-  transition: all 0.3s ease;
+  z-index: 1000;
+  font-family: 'JetBrains Mono', monospace;
 `;
 
-const ModalContent = styled.div<{ $isOpen: boolean }>`
-  background: ${({ theme }) => theme.colors.surface};
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 20px;
-  padding: 2rem;
-  max-width: 800px;
-  width: 90vw;
+const ModalContent = styled(motion.div)`
+  background: #1a1b23;
+  border-radius: 16px;
+  width: 90%;
+  max-width: 600px;
   max-height: 90vh;
   overflow-y: auto;
-  transform: ${({ $isOpen }) => $isOpen ? 'scale(1) translateY(0)' : 'scale(0.9) translateY(20px)'};
-  transition: all 0.3s ease;
-  box-shadow: ${({ theme }) => theme.shadows.xl};
+  border: 1px solid rgba(103, 126, 234, 0.2);
+  color: #f9fafb;
 `;
 
 const ModalHeader = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 2rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid ${({ theme }) => theme.colors.border};
+  padding: 1.5rem;
+  border-bottom: 1px solid rgba(103, 126, 234, 0.1);
+  
+  h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #667eea;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
 `;
 
-const ModalTitle = styled.h2`
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: ${({ theme }) => theme.colors.text.primary};
+const ModalBody = styled.div`
+  padding: 1.5rem;
+`;
+
+const Form = styled.form`
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  
-  svg {
-    color: ${({ theme }) => theme.colors.primary};
-  }
-`;
-
-const CloseButton = styled.button`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  background: transparent;
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 10px;
-  color: ${({ theme }) => theme.colors.text.secondary};
-  cursor: pointer;
-  transition: all 0.2s;
-  
-  &:hover {
-    background: ${({ theme }) => theme.colors.border};
-    color: ${({ theme }) => theme.colors.text.primary};
-  }
-`;
-
-const CrewSelectionSection = styled.div`
-  margin-bottom: 2rem;
-`;
-
-const SectionTitle = styled.h3`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-  font-size: 1.125rem;
-  color: ${({ theme }) => theme.colors.text.primary};
-  
-  svg {
-    color: ${({ theme }) => theme.colors.primary};
-  }
-`;
-
-const SearchContainer = styled.div`
-  position: relative;
-  margin-bottom: 1.5rem;
-  
-  svg {
-    position: absolute;
-    left: 1rem;
-    top: 50%;
-    transform: translateY(-50%);
-    color: ${({ theme }) => theme.colors.text.secondary};
-    width: 16px;
-    height: 16px;
-  }
-`;
-
-const SearchInput = styled.input`
-  width: 100%;
-  padding: 0.75rem 1rem 0.75rem 3rem;
-  background: ${({ theme }) => theme.colors.background};
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 10px;
-  color: ${({ theme }) => theme.colors.text.primary};
-  font-size: 0.875rem;
-  transition: all 0.2s;
-  
-  &:focus {
-    outline: none;
-    border-color: ${({ theme }) => theme.colors.primary};
-    box-shadow: 0 0 0 3px ${({ theme }) => theme.colors.primary}20;
-  }
-  
-  &::placeholder {
-    color: ${({ theme }) => theme.colors.text.muted};
-  }
-`;
-
-const CrewGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1rem;
-  max-height: 300px;
-  overflow-y: auto;
-`;
-
-const CrewCard = styled.div<{ $selected: boolean; $available: boolean }>`
-  padding: 1rem;
-  border: 2px solid ${({ $selected, theme }) => 
-    $selected ? theme.colors.primary : theme.colors.border
-  };
-  border-radius: 10px;
-  background: ${({ $selected, theme }) => 
-    $selected ? theme.colors.primary + '10' : theme.colors.background
-  };
-  cursor: ${({ $available }) => $available ? 'pointer' : 'not-allowed'};
-  transition: all 0.2s;
-  opacity: ${({ $available }) => $available ? 1 : 0.6};
-  
-  &:hover {
-    ${({ $available, theme }) => $available && `
-      transform: translateY(-2px);
-      box-shadow: ${theme.shadows.md};
-    `}
-  }
-`;
-
-const CrewName = styled.div`
-  font-weight: 600;
-  color: ${({ theme }) => theme.colors.text.primary};
-  margin-bottom: 0.5rem;
-`;
-
-const CrewPosition = styled.div`
-  font-size: 0.875rem;
-  color: ${({ theme }) => theme.colors.primary};
-  font-weight: 500;
-  margin-bottom: 0.25rem;
-`;
-
-const CrewDepartment = styled.div`
-  font-size: 0.75rem;
-  color: ${({ theme }) => theme.colors.text.secondary};
-  margin-bottom: 0.5rem;
-`;
-
-const CrewMeta = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.75rem;
-  color: ${({ theme }) => theme.colors.text.muted};
-`;
-
-const AvailabilityBadge = styled.span<{ $available: boolean }>`
-  padding: 0.125rem 0.5rem;
-  border-radius: 12px;
-  font-size: 0.625rem;
-  font-weight: 500;
-  text-transform: uppercase;
-  background: ${({ $available, theme }) => 
-    $available ? theme.colors.success + '20' : theme.colors.gray[500] + '20'
-  };
-  color: ${({ $available, theme }) => 
-    $available ? theme.colors.success : theme.colors.gray[500]
-  };
+  flex-direction: column;
+  gap: 1.5rem;
 `;
 
 const FormSection = styled.div`
-  border-top: 1px solid ${({ theme }) => theme.colors.border};
-  padding-top: 2rem;
+  h3 {
+    margin: 0 0 1rem 0;
+    font-size: 1rem;
+    font-weight: 500;
+    color: #667eea;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
 `;
 
-const FormGroup = styled.div`
-  margin-bottom: 1.5rem;
-`;
-
-const FormRow = styled.div`
+const FormGrid = styled.div`
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 1rem;
-  margin-bottom: 1.5rem;
+  
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const FormField = styled.div<{ $fullWidth?: boolean }>`
+  display: flex;
+  flex-direction: column;
+  ${({ $fullWidth }) => $fullWidth && 'grid-column: 1 / -1;'}
 `;
 
 const Label = styled.label`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #f9fafb;
   margin-bottom: 0.5rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: ${({ theme }) => theme.colors.text.primary};
   
-  svg {
-    width: 16px;
-    height: 16px;
-    color: ${({ theme }) => theme.colors.primary};
+  .required {
+    color: #ef4444;
   }
 `;
 
-const Input = styled.input`
-  width: 100%;
-  padding: 0.75rem 1rem;
-  background: ${({ theme }) => theme.colors.background};
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 10px;
-  color: ${({ theme }) => theme.colors.text.primary};
+const Input = styled.input<{ $hasError?: boolean }>`
+  padding: 0.75rem;
+  border: 1px solid ${({ $hasError }) => $hasError ? '#ef4444' : 'rgba(103, 126, 234, 0.2)'};
+  border-radius: 8px;
+  background: rgba(15, 16, 21, 0.9);
+  color: #f9fafb;
   font-size: 0.875rem;
-  transition: all 0.2s;
+  font-family: 'JetBrains Mono', monospace;
   
   &:focus {
     outline: none;
-    border-color: ${({ theme }) => theme.colors.primary};
-    box-shadow: 0 0 0 3px ${({ theme }) => theme.colors.primary}20;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(103, 126, 234, 0.1);
+    background: rgba(10, 11, 16, 0.95);
   }
   
   &::placeholder {
-    color: ${({ theme }) => theme.colors.text.muted};
+    color: #6b7280;
+  }
+  
+  &[type="date"] {
+    position: relative;
+    color-scheme: dark;
+    
+    &::-webkit-calendar-picker-indicator {
+      background-color: #667eea;
+      border-radius: 3px;
+      cursor: pointer;
+      filter: invert(1);
+    }
+    
+    &::-webkit-inner-spin-button,
+    &::-webkit-clear-button {
+      display: none;
+    }
+  }
+  
+  &:-webkit-autofill,
+  &:-webkit-autofill:hover,
+  &:-webkit-autofill:focus,
+  &:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px rgba(15, 16, 21, 0.9) inset !important;
+    -webkit-text-fill-color: #f9fafb !important;
+    color: #f9fafb !important;
   }
 `;
 
-const TextArea = styled.textarea`
-  width: 100%;
+const Select = styled.select<{ $hasError?: boolean }>`
+  padding: 0.75rem;
+  border: 1px solid ${({ $hasError }) => $hasError ? '#ef4444' : 'rgba(103, 126, 234, 0.2)'};
+  border-radius: 8px;
+  background: rgba(15, 16, 21, 0.9);
+  color: #f9fafb;
+  font-size: 0.875rem;
+  font-family: 'JetBrains Mono', monospace;
+  
+  &:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(103, 126, 234, 0.1);
+    background: rgba(10, 11, 16, 0.95);
+  }
+  
+  option {
+    background: #1a1b23;
+    color: #f9fafb;
+  }
+`;
+
+const TextArea = styled.textarea<{ $hasError?: boolean }>`
+  padding: 0.75rem;
+  border: 1px solid ${({ $hasError }) => $hasError ? '#ef4444' : 'rgba(103, 126, 234, 0.2)'};
+  border-radius: 8px;
+  background: rgba(15, 16, 21, 0.9);
+  color: #f9fafb;
+  font-size: 0.875rem;
+  font-family: 'JetBrains Mono', monospace;
   min-height: 80px;
-  padding: 0.75rem 1rem;
-  background: ${({ theme }) => theme.colors.background};
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: 10px;
-  color: ${({ theme }) => theme.colors.text.primary};
-  font-size: 0.875rem;
-  font-family: inherit;
   resize: vertical;
-  transition: all 0.2s;
   
   &:focus {
     outline: none;
-    border-color: ${({ theme }) => theme.colors.primary};
-    box-shadow: 0 0 0 3px ${({ theme }) => theme.colors.primary}20;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(103, 126, 234, 0.1);
+    background: rgba(10, 11, 16, 0.95);
   }
   
   &::placeholder {
-    color: ${({ theme }) => theme.colors.text.muted};
+    color: #6b7280;
   }
 `;
 
-const CheckboxContainer = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-`;
-
-const Checkbox = styled.input`
-  width: 18px;
-  height: 18px;
-  accent-color: ${({ theme }) => theme.colors.primary};
-`;
-
-const CheckboxLabel = styled.label`
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.875rem;
-  color: ${({ theme }) => theme.colors.text.primary};
-  cursor: pointer;
+const SelectedCrewInfo = styled.div`
+  background: rgba(103, 126, 234, 0.1);
+  border: 1px solid rgba(103, 126, 234, 0.2);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
   
-  svg {
-    width: 16px;
-    height: 16px;
-    color: ${({ theme }) => theme.colors.primary};
+  h4 {
+    margin: 0 0 0.5rem 0;
+    color: #667eea;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+  
+  p {
+    margin: 0;
+    color: #8b8b8b;
+    font-size: 0.75rem;
   }
 `;
 
-const ModalActions = styled.div`
-  display: flex;
-  gap: 1rem;
-  margin-top: 2rem;
-  justify-content: flex-end;
+const CrewCount = styled.span`
+  background: rgba(103, 126, 234, 0.2);
+  color: #667eea;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-left: 0.5rem;
 `;
 
-const Button = styled.button<{ $variant?: 'primary' | 'secondary' }>`
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
-  border: 1px solid ${({ $variant, theme }) => 
-    $variant === 'primary' ? theme.colors.primary : theme.colors.border
-  };
-  border-radius: 10px;
-  background: ${({ $variant, theme }) => 
-    $variant === 'primary' ? theme.colors.primary : 'transparent'
-  };
-  color: ${({ $variant, theme }) => 
-    $variant === 'primary' ? 'white' : theme.colors.text.primary
-  };
-  font-size: 0.875rem;
+const ProjectStatus = styled.span<{ $status: string }>`
+  padding: 0.125rem 0.375rem;
+  border-radius: 3px;
+  font-size: 0.625rem;
   font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
+  text-transform: uppercase;
+  margin-left: 0.5rem;
   
-  &:hover {
-    background: ${({ $variant, theme }) => 
-      $variant === 'primary' ? theme.colors.primaryDark : theme.colors.border
-    };
-    transform: translateY(-1px);
-  }
-  
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    transform: none;
-  }
-  
-  svg {
-    width: 16px;
-    height: 16px;
-  }
+  ${({ $status }) => {
+    switch ($status) {
+      case 'active':
+        return 'background: rgba(34, 197, 94, 0.1); color: #22c55e;';
+      case 'prep':
+        return 'background: rgba(103, 126, 234, 0.1); color: #667eea;';
+      case 'post':
+        return 'background: rgba(245, 158, 11, 0.1); color: #f59e0b;';
+      case 'completed':
+        return 'background: rgba(107, 114, 128, 0.1); color: #6b7280;';
+      default:
+        return 'background: rgba(107, 114, 128, 0.1); color: #6b7280;';
+    }
+  }}
 `;
 
-const CrewAssignmentModal: React.FC<CrewAssignmentModalProps> = ({
+const LoadingState = styled.div`
+  padding: 1rem;
+  text-align: center;
+  color: #8b8b8b;
+  font-size: 0.875rem;
+`;
+
+const ModalFooter = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  padding: 1.5rem;
+  border-top: 1px solid rgba(103, 126, 234, 0.1);
+`;
+
+export const CrewAssignmentModal: React.FC<CrewAssignmentModalProps> = ({
   isOpen,
   onClose,
-  onSave,
-  projectId,
-  projectStartDate,
-  projectEndDate,
-  assignment,
-  isEditing = false
+  onAssign,
+  selectedCrewIds,
+  title,
+  isProjectSpecific = false,
+  currentProjectId
 }) => {
-  const [crewMembers, setCrewMembers] = useState<CrewMember[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCrewMember, setSelectedCrewMember] = useState<CrewMember | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingCrew, setIsLoadingCrew] = useState(false);
-
-  const [formData, setFormData] = useState<CrewAssignmentFormData>({
-    crew_member_id: 0,
-    role: '',
-    start_date: projectStartDate,
-    end_date: projectEndDate,
-    daily_rate: '',
-    is_key_personnel: false,
-    notes: '',
+  const [formData, setFormData] = useState<AssignmentData>({
+    projectId: currentProjectId || '',
+    position: '',
+    positionId: '',
+    departmentId: '',
+    startDate: '',
+    endDate: '',
+    dailyRate: undefined,
+    notes: ''
   });
 
+  // State for API data
+  const [departments, setDepartments] = useState<DepartmentWithPositions[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [dataLoading, setDataLoading] = useState(false);
+
+  // Load data when modal opens
   useEffect(() => {
     if (isOpen) {
-      fetchCrewMembers();
-      
-      // Pre-populate form data for editing
-      if (isEditing && assignment) {
-        setFormData({
-          crew_member_id: assignment.crew_member.id,
-          role: assignment.role,
-          start_date: assignment.start_date,
-          end_date: assignment.end_date,
-          daily_rate: assignment.daily_rate,
-          is_key_personnel: assignment.is_key_personnel,
-          notes: assignment.notes || '',
-        });
-        
-        // Pre-select crew member for editing
-        setSelectedCrewMember({
-          id: assignment.crew_member.id,
-          first_name: assignment.crew_member.first_name,
-          last_name: assignment.crew_member.last_name,
-          email: assignment.crew_member.email,
-          phone_primary: '',
-          primary_position: assignment.crew_member.primary_position,
-          is_available: true
-        });
-      } else {
-        // Reset for new assignment
-        setFormData({
-          crew_member_id: 0,
-          role: '',
-          start_date: projectStartDate,
-          end_date: projectEndDate,
-          daily_rate: '',
-          is_key_personnel: false,
-          notes: '',
-        });
-        setSelectedCrewMember(null);
-      }
+      loadData();
     }
-  }, [isOpen, isEditing, assignment, projectStartDate, projectEndDate]);
+  }, [isOpen]);
 
+  // Auto-select current project if in project-specific mode
   useEffect(() => {
-    if (selectedCrewMember && !isEditing) {
+    if (isProjectSpecific && currentProjectId) {
       setFormData(prev => ({
         ...prev,
-        crew_member_id: selectedCrewMember.id,
-        role: selectedCrewMember.primary_position.title,
+        projectId: currentProjectId
       }));
     }
-  }, [selectedCrewMember, isEditing]);
+  }, [isProjectSpecific, currentProjectId]);
 
-  const fetchCrewMembers = async () => {
-    setIsLoadingCrew(true);
+  const loadData = async () => {
+    setDataLoading(true);
     try {
-      const mockCrewMembers: CrewMember[] = [
-        {
-          id: 1,
-          first_name: "Jana",
-          last_name: "Svobodová",
-          email: "jana.svobodova@email.com",
-          phone_primary: "+420 123 456 789",
-          primary_position: {
-            id: 1,
-            title: "Režisérka",
-            department: { id: 1, name: "Režie" }
-          },
-          is_available: true,
-          skills: ["Drama", "Independent Film", "Casting"],
-          experience_years: 15
-        },
-        {
-          id: 2,
-          first_name: "Tomáš",
-          last_name: "Novák",
-          email: "tomas.novak@email.com",
-          phone_primary: "+420 123 456 790",
-          primary_position: {
-            id: 2,
-            title: "Kameraman",
-            department: { id: 2, name: "Kamera" }
-          },
-          is_available: true,
-          skills: ["4K", "Steadicam", "Drone"],
-          experience_years: 12
-        },
-        {
-          id: 3,
-          first_name: "Petra",
-          last_name: "Dvořáková",
-          email: "petra.dvorakova@email.com",
-          phone_primary: "+420 123 456 791",
-          primary_position: {
-            id: 3,
-            title: "Zvukař",
-            department: { id: 3, name: "Zvuk" }
-          },
-          is_available: false,
-          skills: ["Pro Tools", "Location Sound", "Post-Production"],
-          experience_years: 8
-        },
-        {
-          id: 4,
-          first_name: "Martin",
-          last_name: "Černý",
-          email: "martin.cerny@email.com",
-          phone_primary: "+420 123 456 792",
-          primary_position: {
-            id: 4,
-            title: "Scénárista",
-            department: { id: 4, name: "Scénář" }
-          },
-          is_available: true,
-          skills: ["Drama", "Comedy", "Character Development"],
-          experience_years: 20
-        }
-      ];
-      
-      setCrewMembers(mockCrewMembers);
+      // Load both departments and projects in parallel
+      const [departmentsData, projectsData] = await Promise.allSettled([
+        crewService.getDepartmentsWithPositions(),
+        projectService.getProjects()
+      ]);
+
+      if (departmentsData.status === 'fulfilled') {
+        setDepartments(departmentsData.value);
+        console.log('📋 Departments loaded for assignment:', departmentsData.value);
+      } else {
+        console.error('Failed to load departments:', departmentsData.reason);
+      }
+
+      if (projectsData.status === 'fulfilled') {
+        // Filter active projects for assignment
+        const activeProjects = departmentsData.value.filter((p: Project) => 
+          p.status === 'active' || p.status === 'prep'
+        );
+        setProjects(activeProjects);
+        console.log('🎬 Projects loaded for assignment:', activeProjects);
+      } else {
+        console.error('Failed to load projects:', projectsData.reason);
+      }
     } catch (error) {
-      console.error('Error fetching crew members:', error);
+      console.error('Failed to load assignment data:', error);
     } finally {
-      setIsLoadingCrew(false);
+      setDataLoading(false);
     }
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value, type } = e.target;
+  const handleInputChange = (field: keyof AssignmentData, value: any) => {
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
+      [field]: value
     }));
+  };
+
+  const handleDepartmentChange = (departmentId: string) => {
+    setSelectedDepartment(departmentId);
+    setFormData(prev => ({
+      ...prev,
+      departmentId: departmentId,
+      positionId: '',
+      position: ''
+    }));
+  };
+
+  const handlePositionChange = (positionId: string) => {
+    const position = getCurrentPositions().find(p => p.id.toString() === positionId);
+    setFormData(prev => ({
+      ...prev,
+      positionId: positionId,
+      position: position?.title || ''
+    }));
+  };
+
+  const getCurrentPositions = () => {
+    if (!selectedDepartment) return [];
+    const dept = departments.find(d => d.id.toString() === selectedDepartment);
+    return dept?.positions || [];
+  };
+
+  const getSelectedProject = () => {
+    return projects.find(p => p.id === formData.projectId);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedCrewMember && !isEditing) return;
-
     setIsLoading(true);
+
     try {
-      await onSave({
-        ...formData,
-        daily_rate: Number(formData.daily_rate)
+      console.log('🎯 Assigning crew with data:', formData);
+      await onAssign(formData);
+      
+      // Reset form
+      setFormData({
+        projectId: currentProjectId || '',
+        position: '',
+        positionId: '',
+        departmentId: '',
+        startDate: '',
+        endDate: '',
+        dailyRate: undefined,
+        notes: ''
       });
+      setSelectedDepartment('');
+      
       onClose();
     } catch (error) {
-      console.error('Failed to assign crew member:', error);
+      console.error('Assignment failed:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const filteredCrewMembers = crewMembers.filter(member =>
-    `${member.first_name} ${member.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    member.primary_position.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    member.primary_position.department.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const isFormValid = () => {
+    const hasPosition = formData.positionId !== '';
+    const hasStartDate = formData.startDate !== '';
+    const hasProject = formData.projectId !== '';
+    
+    return hasPosition && hasStartDate && hasProject && !dataLoading;
+  };
 
   if (!isOpen) return null;
 
   return (
-    <ModalOverlay $isOpen={isOpen} onClick={onClose}>
-      <ModalContent $isOpen={isOpen} onClick={(e) => e.stopPropagation()}>
-        <ModalHeader>
-          <ModalTitle>
-            <User />
-            {isEditing ? 'Upravit přiřazení štábu' : 'Přiřadit člena štábu'}
-          </ModalTitle>
-          <CloseButton onClick={onClose}>
-            <X />
-          </CloseButton>
-        </ModalHeader>
+    <AnimatePresence>
+      <ModalOverlay
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+      >
+        <ModalContent
+          initial={{ scale: 0.9, opacity: 0, y: 20 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          exit={{ scale: 0.9, opacity: 0, y: 20 }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <ModalHeader>
+            <h2>
+              <Users size={20} />
+              Přiřadit štáb k projektu
+            </h2>
+            <Button variant="ghost" icon={<X size={20} />} onClick={onClose} />
+          </ModalHeader>
 
-        <form onSubmit={handleSubmit}>
-          {!isEditing && (
-            <CrewSelectionSection>
-              <SectionTitle>
-                <Search />
-                Vybrat člena štábu
-              </SectionTitle>
-              
-              <SearchContainer>
-                <Search size={16} />
-                <SearchInput
-                  type="text"
-                  placeholder="Hledat podle jména, pozice nebo oddělení..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </SearchContainer>
+          <ModalBody>
+            <SelectedCrewInfo>
+              <h4>
+                Přiřazení štábu k projektu
+                <CrewCount>{selectedCrewIds.length} vybraných členů</CrewCount>
+              </h4>
+              <p>Vyberte projekt a pozici z dostupných oddělení pro přiřazení vybraných členů štábu.</p>
+            </SelectedCrewInfo>
 
-              {isLoadingCrew ? (
-                <div style={{ textAlign: 'center', padding: '2rem' }}>
-                  Načítání štábu...
-                </div>
-              ) : (
-                <CrewGrid>
-                  {filteredCrewMembers.map((member) => (
-                    <CrewCard
-                      key={member.id}
-                      $selected={selectedCrewMember?.id === member.id}
-                      $available={member.is_available}
-                      onClick={() => member.is_available && setSelectedCrewMember(member)}
+            {dataLoading ? (
+              <LoadingState>
+                Načítám projekty a oddělení...
+              </LoadingState>
+            ) : (
+              <Form onSubmit={handleSubmit}>
+                {/* Project Selection */}
+                <FormSection>
+                  <h3>
+                    <FolderOpen size={16} />
+                    Výběr projektu
+                  </h3>
+                  <FormField $fullWidth>
+                    <Label>
+                      Projekt <span className="required">*</span>
+                    </Label>
+                    <Select
+                      value={formData.projectId}
+                      onChange={(e) => handleInputChange('projectId', e.target.value)}
+                      disabled={isProjectSpecific} // Disable if already in project context
+                      required
                     >
-                      <CrewName>
-                        {member.first_name} {member.last_name}
-                      </CrewName>
-                      <CrewPosition>{member.primary_position.title}</CrewPosition>
-                      <CrewDepartment>{member.primary_position.department.name}</CrewDepartment>
-                      <CrewMeta>
-                        <span>{member.experience_years} let zkušeností</span>
-                        <AvailabilityBadge $available={member.is_available}>
-                          {member.is_available ? 'Dostupný' : 'Nedostupný'}
-                        </AvailabilityBadge>
-                      </CrewMeta>
-                    </CrewCard>
-                  ))}
-                </CrewGrid>
-              )}
-            </CrewSelectionSection>
-          )}
+                      <option value="">-- Vyberte projekt --</option>
+                      {projects.map(project => (
+                        <option key={project.id} value={project.id}>
+                          {project.title}
+                          <ProjectStatus $status={project.status}>
+                            {project.status}
+                          </ProjectStatus>
+                        </option>
+                      ))}
+                    </Select>
+                    {isProjectSpecific && (
+                      <small style={{ color: '#8b8b8b', fontSize: '0.75rem', marginTop: '0.25rem' }}>
+                        Přiřazování pro aktuální projekt
+                      </small>
+                    )}
+                  </FormField>
+                </FormSection>
 
-          {(selectedCrewMember || isEditing) && (
-            <FormSection>
-              <SectionTitle>
-                <Briefcase />
-                Detaily přiřazení
-              </SectionTitle>
+                {/* Position Assignment */}
+                <FormSection>
+                  <h3>
+                    <MapPin size={16} />
+                    Pozice na projektu
+                  </h3>
+                  <FormGrid>
+                    <FormField>
+                      <Label>
+                        Oddělení <span className="required">*</span>
+                      </Label>
+                      <Select
+                        value={selectedDepartment}
+                        onChange={(e) => handleDepartmentChange(e.target.value)}
+                        required
+                      >
+                        <option value="">Vyberte oddělení</option>
+                        {departments.map(dept => (
+                          <option key={dept.id} value={dept.id}>
+                            {dept.name}
+                          </option>
+                        ))}
+                      </Select>
+                    </FormField>
 
-              {isEditing && (
-                <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '10px' }}>
-                  <strong>Editovaný člen:</strong> {assignment?.crew_member.first_name} {assignment?.crew_member.last_name} ({assignment?.crew_member.email})
-                </div>
-              )}
+                    <FormField>
+                      <Label>
+                        Pozice <span className="required">*</span>
+                      </Label>
+                      <Select
+                        value={formData.positionId || ''}
+                        onChange={(e) => handlePositionChange(e.target.value)}
+                        disabled={!selectedDepartment}
+                        required
+                      >
+                        <option value="">Vyberte pozici</option>
+                        {getCurrentPositions().map(pos => (
+                          <option key={pos.id} value={pos.id}>
+                            {pos.title}
+                          </option>
+                        ))}
+                      </Select>
+                    </FormField>
+                  </FormGrid>
+                </FormSection>
 
-              <FormGroup>
-                <Label>
-                  <Briefcase />
-                  Role v projektu
-                </Label>
-                <Input
-                  type="text"
-                  name="role"
-                  value={formData.role}
-                  onChange={handleInputChange}
-                  placeholder="Např. Hlavní kameraman, Asistent režie..."
-                  required
-                />
-              </FormGroup>
+                {/* Date Range */}
+                <FormSection>
+                  <h3>
+                    <Calendar size={16} />
+                    Termíny práce
+                  </h3>
+                  <FormGrid>
+                    <FormField>
+                      <Label>
+                        Začátek práce <span className="required">*</span>
+                      </Label>
+                      <Input
+                        type="date"
+                        value={formData.startDate}
+                        onChange={(e) => handleInputChange('startDate', e.target.value)}
+                        min={getSelectedProject()?.start_date || undefined}
+                        max={getSelectedProject()?.end_date || undefined}
+                        required
+                      />
+                    </FormField>
 
-              <FormRow>
-                <FormGroup>
-                  <Label>
-                    <Calendar />
-                    Datum začátku
-                  </Label>
-                  <Input
-                    type="date"
-                    name="start_date"
-                    value={formData.start_date}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </FormGroup>
+                    <FormField>
+                      <Label>Konec práce</Label>
+                      <Input
+                        type="date"
+                        value={formData.endDate}
+                        onChange={(e) => handleInputChange('endDate', e.target.value)}
+                        min={formData.startDate}
+                        max={getSelectedProject()?.end_date || undefined}
+                      />
+                    </FormField>
+                  </FormGrid>
+                </FormSection>
 
-                <FormGroup>
-                  <Label>
-                    <Calendar />
-                    Datum konce
-                  </Label>
-                  <Input
-                    type="date"
-                    name="end_date"
-                    value={formData.end_date}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </FormGroup>
-              </FormRow>
+                {/* Financial Terms */}
+                <FormSection>
+                  <h3>
+                    <DollarSign size={16} />
+                    Finanční podmínky
+                  </h3>
+                  <FormField>
+                    <Label>Denní sazba (USD)</Label>
+                    <Input
+                      type="number"
+                      value={formData.dailyRate || ''}
+                      onChange={(e) => handleInputChange('dailyRate', e.target.value ? Number(e.target.value) : undefined)}
+                      placeholder="1500"
+                      min="0"
+                      step="50"
+                    />
+                  </FormField>
+                </FormSection>
 
-              <FormGroup>
-                <Label>
-                  <DollarSign />
-                  Denní sazba (USD)
-                </Label>
-                <Input
-                  type="number"
-                  name="daily_rate"
-                  value={formData.daily_rate}
-                  onChange={handleInputChange}
-                  placeholder="1500"
-                  min="0"
-                  required
-                />
-              </FormGroup>
+                {/* Notes */}
+                <FormSection>
+                  <h3>
+                    <FileText size={16} />
+                    Poznámky
+                  </h3>
+                  <FormField $fullWidth>
+                    <Label>Speciální požadavky, dodatečné informace...</Label>
+                    <TextArea
+                      value={formData.notes}
+                      onChange={(e) => handleInputChange('notes', e.target.value)}
+                      placeholder="Dodatečné informace o přiřazení..."
+                      rows={3}
+                    />
+                  </FormField>
+                </FormSection>
+              </Form>
+            )}
+          </ModalBody>
 
-              <CheckboxContainer>
-                <Checkbox
-                  type="checkbox"
-                  name="is_key_personnel"
-                  checked={formData.is_key_personnel}
-                  onChange={handleInputChange}
-                />
-                <CheckboxLabel>
-                  <Star />
-                  Klíčová pozice
-                </CheckboxLabel>
-              </CheckboxContainer>
-
-              <FormGroup>
-                <Label>Poznámky</Label>
-                <TextArea
-                  name="notes"
-                  value={formData.notes}
-                  onChange={handleInputChange}
-                  placeholder="Dodatečné informace o přiřazení..."
-                />
-              </FormGroup>
-            </FormSection>
-          )}
-
-          <ModalActions>
-            <Button type="button" onClick={onClose}>
+          <ModalFooter>
+            <Button
+              variant="outline"
+              onClick={onClose}
+              disabled={isLoading}
+            >
               Zrušit
             </Button>
-            <Button 
-              type="submit" 
-              $variant="primary" 
-              disabled={isLoading || (!selectedCrewMember && !isEditing)}
+            <Button
+              variant="primary"
+              onClick={handleSubmit}
+              disabled={isLoading || !isFormValid()}
             >
-              <Save />
-              {isLoading ? 'Ukládání...' : isEditing ? 'Uložit změny' : 'Přiřadit ke štábu'}
+              {isLoading ? 'Přiřazuji...' : `Přiřadit štáb (${selectedCrewIds.length})`}
             </Button>
-          </ModalActions>
-        </form>
-      </ModalContent>
-    </ModalOverlay>
+          </ModalFooter>
+        </ModalContent>
+      </ModalOverlay>
+    </AnimatePresence>
   );
 };
 

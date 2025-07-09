@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import styled from 'styled-components';
-import { Card, GlassCard, CardHeader, CardContent } from '../../ui/Card';
-import { PrimaryButton, SecondaryButton, OutlineButton } from '../../ui/Button';
+import { Card } from '../../ui/Card';
+import { Button } from '../../ui/Button';
 
 interface Document {
   id: string;
@@ -42,342 +42,337 @@ interface DocumentViewerProps {
   onCommentAdd?: (documentId: string, comment: any) => void;
   onApprovalRequest?: (documentId: string) => void;
   onApprovalAction?: (documentId: string, action: 'approve' | 'reject', comment?: string) => void;
-  onVersionView: () => void;
+  onVersionHistory?: (documentId: string) => void;
+  onDownload?: (documentId: string) => void;
+  onEdit?: (documentId: string) => void;
   currentUser: {
     name: string;
     role: string;
     permissions: string[];
   };
   formatFileSize: (bytes: number) => string;
-  getStatusColor: (status: string) => string;
 }
 
-export function DocumentViewer({ 
-  document, 
+export function DocumentViewer({
+  document,
   onClose,
   onCommentAdd,
   onApprovalRequest,
   onApprovalAction,
-  onVersionView,
+  onVersionHistory,
+  onDownload,
+  onEdit,
   currentUser,
-  formatFileSize,
-  getStatusColor
+  formatFileSize
 }: DocumentViewerProps) {
+  const [activeTab, setActiveTab] = useState<'preview' | 'comments' | 'history'>('preview');
   const [newComment, setNewComment] = useState('');
   const [commentType, setCommentType] = useState<'comment' | 'suggestion'>('comment');
-  const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [approvalComment, setApprovalComment] = useState('');
+  const [showApprovalDialog, setShowApprovalDialog] = useState(false);
+  const [approvalAction, setApprovalAction] = useState<'approve' | 'reject'>('approve');
 
-  const canApprove = document.permissions.canApprove.includes(currentUser.name) || 
-                    currentUser.permissions.includes('admin');
+  const canEdit = currentUser.permissions.includes('admin') || 
+                  document.permissions.canEdit.includes(currentUser.name);
   
-  const canComment = document.permissions.canView.includes(currentUser.name) ||
-                    currentUser.permissions.includes('admin');
+  const canApprove = currentUser.permissions.includes('admin') || 
+                     document.permissions.canApprove.includes(currentUser.name);
 
   const handleAddComment = () => {
-    if (newComment.trim() && onCommentAdd) {
-      onCommentAdd(document.id, {
-        author: currentUser.name,
-        content: newComment.trim(),
-        type: commentType
-      });
-      setNewComment('');
-    }
-  };
+    if (!newComment.trim() || !onCommentAdd) return;
 
-  const handleApprovalAction = (action: 'approve' | 'reject') => {
-    if (onApprovalAction) {
-      onApprovalAction(document.id, action, newComment || undefined);
-    }
-    setShowApprovalModal(false);
+    const comment = {
+      id: Date.now().toString(),
+      author: currentUser.name,
+      content: newComment,
+      timestamp: new Date().toISOString(),
+      type: commentType,
+      resolved: false
+    };
+
+    onCommentAdd(document.id, comment);
     setNewComment('');
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('cs-CZ');
+  const handleApprovalAction = () => {
+    if (!onApprovalAction) return;
+
+    onApprovalAction(document.id, approvalAction, approvalComment);
+    setShowApprovalDialog(false);
+    setApprovalComment('');
   };
 
-  const getCommentIcon = (type: string) => {
-    const icons = {
-      comment: '💬',
-      suggestion: '💡',
-      approval: '✅',
-      rejection: '❌'
-    };
-    return icons[type as keyof typeof icons] || '💬';
-  };
-
-  const getDocumentPreview = () => {
-    // Placeholder pro document preview
-    if (document.mimeType.startsWith('image/')) {
+  const renderPreview = () => {
+    if (document.mimeType.includes('image')) {
       return (
         <ImagePreview>
-          <PreviewPlaceholder>
-            📷 Náhled obrázku
-            <br />
-            {document.filename}
-          </PreviewPlaceholder>
+          <img src={`/api/documents/${document.id}/preview`} alt={document.title} />
         </ImagePreview>
       );
     }
-    
-    if (document.mimeType === 'application/pdf') {
+
+    if (document.mimeType.includes('pdf')) {
       return (
         <PDFPreview>
-          <PreviewPlaceholder>
-            📄 PDF Dokument
-            <br />
-            {document.filename}
-            <br />
-            <ViewerNote>PDF viewer bude implementován v další iteraci</ViewerNote>
-          </PreviewPlaceholder>
+          <iframe 
+            src={`/api/documents/${document.id}/preview`}
+            title={document.title}
+            width="100%"
+            height="600px"
+          />
         </PDFPreview>
       );
     }
 
+    if (document.mimeType.includes('text')) {
+      return (
+        <TextPreview>
+          <pre>Textový soubor - náhled bude implementován</pre>
+        </TextPreview>
+      );
+    }
+
     return (
-      <GenericPreview>
-        <PreviewPlaceholder>
-          📄 {document.filename}
-          <br />
-          <ViewerNote>Preview pro tento typ souboru není dostupný</ViewerNote>
-        </PreviewPlaceholder>
-      </GenericPreview>
+      <NoPreview>
+        <NoPreviewIcon>📄</NoPreviewIcon>
+        <NoPreviewTitle>Náhled není k dispozici</NoPreviewTitle>
+        <NoPreviewDescription>
+          Pro tento typ souboru ({document.mimeType}) není náhled podporován.
+        </NoPreviewDescription>
+        <Button onClick={() => onDownload?.(document.id)}>
+          📥 Stáhnout soubor
+        </Button>
+      </NoPreview>
     );
+  };
+
+  const renderComments = () => {
+    const sortedComments = [...document.comments].sort((a, b) => 
+      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+
+    return (
+      <CommentsSection>
+        <AddCommentForm>
+          <CommentTypeSelector>
+            <TypeButton 
+              $active={commentType === 'comment'}
+              onClick={() => setCommentType('comment')}
+            >
+              💬 Komentář
+            </TypeButton>
+            <TypeButton 
+              $active={commentType === 'suggestion'}
+              onClick={() => setCommentType('suggestion')}
+            >
+              💡 Návrh
+            </TypeButton>
+          </CommentTypeSelector>
+
+          <CommentTextarea
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+            placeholder="Napište komentář..."
+            rows={3}
+          />
+
+          <CommentActions>
+            <Button onClick={handleAddComment} disabled={!newComment.trim()}>
+              Přidat {commentType === 'comment' ? 'komentář' : 'návrh'}
+            </Button>
+          </CommentActions>
+        </AddCommentForm>
+
+        <CommentsList>
+          {sortedComments.length > 0 ? (
+            sortedComments.map(comment => (
+              <CommentItem key={comment.id} $type={comment.type}>
+                <CommentHeader>
+                  <CommentAuthor>{comment.author}</CommentAuthor>
+                  <CommentTime>
+                    {new Date(comment.timestamp).toLocaleDateString('cs-CZ', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </CommentTime>
+                  <CommentTypeBadge $type={comment.type}>
+                    {comment.type === 'comment' ? '💬' : 
+                     comment.type === 'suggestion' ? '💡' : 
+                     comment.type === 'approval' ? '✅' : '❌'}
+                  </CommentTypeBadge>
+                </CommentHeader>
+                <CommentContent>{comment.content}</CommentContent>
+                {comment.resolved && (
+                  <CommentResolved>✅ Vyřešeno</CommentResolved>
+                )}
+              </CommentItem>
+            ))
+          ) : (
+            <EmptyComments>
+              <EmptyCommentsIcon>💬</EmptyCommentsIcon>
+              <EmptyCommentsText>Zatím žádné komentáře</EmptyCommentsText>
+            </EmptyComments>
+          )}
+        </CommentsList>
+      </CommentsSection>
+    );
+  };
+
+  const renderHistory = () => {
+    return (
+      <HistorySection>
+        <HistoryHeader>
+          <h4>Historie verzí</h4>
+          <Button onClick={() => onVersionHistory?.(document.id)}>
+            📋 Detailní historie
+          </Button>
+        </HistoryHeader>
+
+        <VersionsList>
+          {document.versions.length > 0 ? (
+            document.versions.slice(0, 5).map((version, index) => (
+              <VersionItem key={index}>
+                <VersionNumber>v{version.version || `1.${index}`}</VersionNumber>
+                <VersionInfo>
+                  <VersionDate>
+                    {new Date(version.uploadedAt || document.uploadedAt).toLocaleDateString('cs-CZ')}
+                  </VersionDate>
+                  <VersionAuthor>od {version.uploadedBy || document.uploadedBy}</VersionAuthor>
+                </VersionInfo>
+                <VersionActions>
+                  <Button onClick={() => console.log('View version', version)}>
+                    👁️ Zobrazit
+                  </Button>
+                </VersionActions>
+              </VersionItem>
+            ))
+          ) : (
+            <EmptyHistory>
+              <EmptyHistoryIcon>📋</EmptyHistoryIcon>
+              <EmptyHistoryText>Žádná historie verzí</EmptyHistoryText>
+            </EmptyHistory>
+          )}
+        </VersionsList>
+      </HistorySection>
+    );
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('cs-CZ', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   return (
     <ViewerContainer>
-      {/* Header */}
       <ViewerHeader>
         <HeaderLeft>
           <BackButton onClick={onClose}>
             ← Zpět na seznam
           </BackButton>
-          <DocumentTitleSection>
+          <DocumentInfo>
             <DocumentTitle>{document.title}</DocumentTitle>
-            <DocumentFilename>{document.filename}</DocumentFilename>
-          </DocumentTitleSection>
+            <DocumentMeta>
+              {document.filename} • {formatFileSize(document.size)} • v{document.version}
+            </DocumentMeta>
+          </DocumentInfo>
         </HeaderLeft>
 
         <HeaderActions>
-          <SecondaryButton onClick={onVersionView} size="sm">
-            📚 Verze ({document.versions.length})
-          </SecondaryButton>
-          
-          {document.status === 'draft' && onApprovalRequest && (
-            <PrimaryButton 
-              onClick={() => onApprovalRequest(document.id)}
-              size="sm"
-            >
-              📤 Poslat ke schválení
-            </PrimaryButton>
+          {canEdit && (
+            <Button onClick={() => onEdit?.(document.id)}>
+              ✏️ Upravit
+            </Button>
           )}
           
-          {document.status === 'review' && canApprove && (
-            <PrimaryButton 
-              onClick={() => setShowApprovalModal(true)}
-              size="sm"
-            >
+          <Button onClick={() => onDownload?.(document.id)}>
+            📥 Stáhnout
+          </Button>
+
+          {canApprove && document.approvalRequired && document.status !== 'approved' && (
+            <Button onClick={() => setShowApprovalDialog(true)}>
               ✅ Schválit/Zamítnout
-            </PrimaryButton>
+            </Button>
           )}
         </HeaderActions>
       </ViewerHeader>
 
+      <ViewerTabs>
+        <TabButton 
+          $active={activeTab === 'preview'} 
+          onClick={() => setActiveTab('preview')}
+        >
+          👁️ Náhled
+        </TabButton>
+        <TabButton 
+          $active={activeTab === 'comments'} 
+          onClick={() => setActiveTab('comments')}
+        >
+          💬 Komentáře ({document.comments.length})
+        </TabButton>
+        <TabButton 
+          $active={activeTab === 'history'} 
+          onClick={() => setActiveTab('history')}
+        >
+          📋 Historie
+        </TabButton>
+      </ViewerTabs>
+
       <ViewerContent>
-        {/* Document Preview */}
-        <DocumentPreviewSection>
-          <GlassCard>
-            <CardHeader>
-              <PreviewHeader>
-                <h3>Náhled dokumentu</h3>
-                <DocumentMeta>
-                  <StatusBadge $color={getStatusColor(document.status)}>
-                    {document.status}
-                  </StatusBadge>
-                  <VersionBadge>v{document.version}</VersionBadge>
-                  <SizeBadge>{formatFileSize(document.size)}</SizeBadge>
-                </DocumentMeta>
-              </PreviewHeader>
-            </CardHeader>
-            <CardContent>
-              <PreviewContainer>
-                {getDocumentPreview()}
-              </PreviewContainer>
-            </CardContent>
-          </GlassCard>
-        </DocumentPreviewSection>
-
-        {/* Document Info & Comments */}
-        <DocumentSidebar>
-          {/* Document Info */}
-          <GlassCard>
-            <CardHeader>
-              <h4>Informace o dokumentu</h4>
-            </CardHeader>
-            <CardContent>
-              <InfoGrid>
-                <InfoItem>
-                  <InfoLabel>Typ:</InfoLabel>
-                  <InfoValue>{document.type}</InfoValue>
-                </InfoItem>
-                
-                <InfoItem>
-                  <InfoLabel>Nahrál:</InfoLabel>
-                  <InfoValue>{document.uploadedBy}</InfoValue>
-                </InfoItem>
-                
-                <InfoItem>
-                  <InfoLabel>Nahráno:</InfoLabel>
-                  <InfoValue>{formatDate(document.uploadedAt)}</InfoValue>
-                </InfoItem>
-                
-                <InfoItem>
-                  <InfoLabel>Upraveno:</InfoLabel>
-                  <InfoValue>{formatDate(document.lastModified)}</InfoValue>
-                </InfoItem>
-                
-                {document.approvedBy && (
-                  <InfoItem>
-                    <InfoLabel>Schválil:</InfoLabel>
-                    <InfoValue>{document.approvedBy}</InfoValue>
-                  </InfoItem>
-                )}
-              </InfoGrid>
-
-              {document.description && (
-                <DocumentDescription>
-                  <InfoLabel>Popis:</InfoLabel>
-                  <DescriptionText>{document.description}</DescriptionText>
-                </DocumentDescription>
-              )}
-
-              {document.tags.length > 0 && (
-                <DocumentTagsSection>
-                  <InfoLabel>Tagy:</InfoLabel>
-                  <TagsList>
-                    {document.tags.map(tag => (
-                      <DocumentTag key={tag}>{tag}</DocumentTag>
-                    ))}
-                  </TagsList>
-                </DocumentTagsSection>
-              )}
-            </CardContent>
-          </GlassCard>
-
-          {/* Comments Section */}
-          <GlassCard>
-            <CardHeader>
-              <h4>Komentáře ({document.comments.length})</h4>
-            </CardHeader>
-            <CardContent>
-              <CommentsSection>
-                <CommentsList>
-                  {document.comments.map(comment => (
-                    <CommentItem key={comment.id} $type={comment.type}>
-                      <CommentHeader>
-                        <CommentAuthor>
-                          <CommentIcon>{getCommentIcon(comment.type)}</CommentIcon>
-                          {comment.author}
-                        </CommentAuthor>
-                        <CommentTime>{formatDate(comment.timestamp)}</CommentTime>
-                      </CommentHeader>
-                      
-                      <CommentContent>{comment.content}</CommentContent>
-                      
-                      {comment.type === 'suggestion' && !comment.resolved && (
-                        <CommentActions>
-                          <CommentActionButton>
-                            ✅ Vyřešit
-                          </CommentActionButton>
-                        </CommentActions>
-                      )}
-                    </CommentItem>
-                  ))}
-                  
-                  {document.comments.length === 0 && (
-                    <EmptyComments>
-                      Zatím žádné komentáře
-                    </EmptyComments>
-                  )}
-                </CommentsList>
-
-                {/* Add Comment Form */}
-                {canComment && (
-                  <AddCommentForm>
-                    <CommentTypeSelector>
-                      <CommentTypeButton
-                        $isActive={commentType === 'comment'}
-                        onClick={() => setCommentType('comment')}
-                      >
-                        💬 Komentář
-                      </CommentTypeButton>
-                      <CommentTypeButton
-                        $isActive={commentType === 'suggestion'}
-                        onClick={() => setCommentType('suggestion')}
-                      >
-                        💡 Návrh
-                      </CommentTypeButton>
-                    </CommentTypeSelector>
-                    
-                    <CommentTextarea
-                      value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
-                      placeholder={commentType === 'comment' 
-                        ? 'Napište komentář...' 
-                        : 'Napište návrh na úpravu...'
-                      }
-                      rows={3}
-                    />
-                    
-                    <CommentActions>
-                      <PrimaryButton 
-                        onClick={handleAddComment}
-                        disabled={!newComment.trim()}
-                        size="sm"
-                      >
-                        {commentType === 'comment' ? 'Přidat komentář' : 'Odeslat návrh'}
-                      </PrimaryButton>
-                    </CommentActions>
-                  </AddCommentForm>
-                )}
-              </CommentsSection>
-            </CardContent>
-          </GlassCard>
-        </DocumentSidebar>
+        {activeTab === 'preview' && renderPreview()}
+        {activeTab === 'comments' && renderComments()}
+        {activeTab === 'history' && renderHistory()}
       </ViewerContent>
 
-      {/* Approval Modal */}
-      {showApprovalModal && (
-        <ApprovalModal onClick={() => setShowApprovalModal(false)}>
-          <ApprovalModalContent onClick={e => e.stopPropagation()}>
-            <ApprovalModalHeader>
-              <h3>Schválení dokumentu</h3>
-              <p>Rozhodněte o schválení dokumentu "{document.title}"</p>
-            </ApprovalModalHeader>
-            
-            <ApprovalForm>
+      {showApprovalDialog && (
+        <ApprovalDialog>
+          <DialogOverlay onClick={() => setShowApprovalDialog(false)} />
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Schválení dokumentu</DialogTitle>
+            </DialogHeader>
+
+            <DialogBody>
+              <ActionSelector>
+                <ActionButton 
+                  $active={approvalAction === 'approve'}
+                  onClick={() => setApprovalAction('approve')}
+                >
+                  ✅ Schválit
+                </ActionButton>
+                <ActionButton 
+                  $active={approvalAction === 'reject'}
+                  onClick={() => setApprovalAction('reject')}
+                >
+                  ❌ Zamítnout
+                </ActionButton>
+              </ActionSelector>
+
               <CommentTextarea
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
+                value={approvalComment}
+                onChange={(e) => setApprovalComment(e.target.value)}
                 placeholder="Volitelný komentář k rozhodnutí..."
                 rows={3}
               />
-            </ApprovalForm>
-            
-            <ApprovalModalActions>
-              <OutlineButton onClick={() => setShowApprovalModal(false)}>
+            </DialogBody>
+
+            <DialogActions>
+              <Button onClick={() => setShowApprovalDialog(false)}>
                 Zrušit
-              </OutlineButton>
-              <SecondaryButton onClick={() => handleApprovalAction('reject')}>
-                ❌ Zamítnout
-              </SecondaryButton>
-              <PrimaryButton onClick={() => handleApprovalAction('approve')}>
-                ✅ Schválit
-              </PrimaryButton>
-            </ApprovalModalActions>
-          </ApprovalModalContent>
-        </ApprovalModal>
+              </Button>
+              <Button onClick={handleApprovalAction}>
+                {approvalAction === 'approve' ? 'Schválit' : 'Zamítnout'}
+              </Button>
+            </DialogActions>
+          </DialogContent>
+        </ApprovalDialog>
       )}
     </ViewerContainer>
   );
@@ -387,7 +382,10 @@ export function DocumentViewer({
 const ViewerContainer = styled.div`
   display: flex;
   flex-direction: column;
-  height: 100%;
+  height: 100vh;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
   overflow: hidden;
 `;
 
@@ -395,413 +393,433 @@ const ViewerHeader = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: ${props => props.theme.spacing.lg};
-  padding: ${props => props.theme.spacing.lg};
-  border-bottom: 1px solid ${props => props.theme.colors.border};
-  background: ${props => props.theme.colors.surface};
-  
-  @media (max-width: 768px) {
-    flex-direction: column;
-    align-items: stretch;
-  }
+  padding: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
 `;
 
 const HeaderLeft = styled.div`
   display: flex;
   align-items: center;
-  gap: ${props => props.theme.spacing.lg};
+  gap: 1rem;
   flex: 1;
   min-width: 0;
 `;
 
 const BackButton = styled.button`
-  padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.md};
-  border: 1px solid ${props => props.theme.colors.border};
-  background: ${props => props.theme.colors.background};
-  color: ${props => props.theme.colors.text};
-  border-radius: ${props => props.theme.borderRadius.md};
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #fff;
   cursor: pointer;
-  transition: all ${props => props.theme.transitions.fast};
-  white-space: nowrap;
-  
+  transition: all 0.2s;
+
   &:hover {
-    background: ${props => props.theme.colors.surface};
+    background: rgba(255, 255, 255, 0.1);
   }
 `;
 
-const DocumentTitleSection = styled.div`
+const DocumentInfo = styled.div`
   flex: 1;
   min-width: 0;
 `;
 
 const DocumentTitle = styled.h2`
-  margin: 0 0 ${props => props.theme.spacing.xs} 0;
-  color: ${props => props.theme.colors.text};
+  margin: 0 0 0.25rem 0;
+  color: #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 `;
 
-const DocumentFilename = styled.div`
-  font-size: ${props => props.theme.typography.fontSize.sm};
-  color: ${props => props.theme.colors.textSecondary};
-  font-family: monospace;
+const DocumentMeta = styled.div`
+  color: #8b8b8b;
+  font-size: 0.875rem;
 `;
 
 const HeaderActions = styled.div`
   display: flex;
-  gap: ${props => props.theme.spacing.md};
-  
-  @media (max-width: 768px) {
-    justify-content: center;
+  gap: 1rem;
+`;
+
+const ViewerTabs = styled.div`
+  display: flex;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+`;
+
+const TabButton = styled.button<{ $active?: boolean }>`
+  padding: 1rem 1.5rem;
+  background: ${props => props.$active 
+    ? 'rgba(103, 126, 234, 0.2)' 
+    : 'transparent'
+  };
+  border: none;
+  border-bottom: 2px solid ${props => props.$active 
+    ? '#667eea' 
+    : 'transparent'
+  };
+  color: ${props => props.$active ? '#667eea' : '#8b8b8b'};
+  font-family: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.05);
   }
 `;
 
 const ViewerContent = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 400px;
-  gap: ${props => props.theme.spacing.lg};
   flex: 1;
-  min-height: 0;
-  padding: ${props => props.theme.spacing.lg};
-  
-  @media (max-width: 1024px) {
-    grid-template-columns: 1fr;
-  }
-`;
-
-const DocumentPreviewSection = styled.div`
-  min-height: 0;
-  overflow: hidden;
-`;
-
-const PreviewHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: ${props => props.theme.spacing.md};
-`;
-
-const DocumentMeta = styled.div`
-  display: flex;
-  gap: ${props => props.theme.spacing.sm};
-`;
-
-const StatusBadge = styled.span<{ $color: string }>`
-  padding: 2px 8px;
-  border-radius: ${props => props.theme.borderRadius.md};
-  background: ${props => props.$color}20;
-  color: ${props => props.$color};
-  font-size: ${props => props.theme.typography.fontSize.xs};
-  font-weight: ${props => props.theme.typography.fontWeight.medium};
-  text-transform: capitalize;
-`;
-
-const VersionBadge = styled.span`
-  padding: 2px 8px;
-  background: ${props => props.theme.colors.background};
-  border: 1px solid ${props => props.theme.colors.border};
-  border-radius: ${props => props.theme.borderRadius.md};
-  font-size: ${props => props.theme.typography.fontSize.xs};
-  color: ${props => props.theme.colors.textSecondary};
-`;
-
-const SizeBadge = styled.span`
-  padding: 2px 8px;
-  background: ${props => props.theme.colors.background};
-  border: 1px solid ${props => props.theme.colors.border};
-  border-radius: ${props => props.theme.borderRadius.md};
-  font-size: ${props => props.theme.typography.fontSize.xs};
-  color: ${props => props.theme.colors.textSecondary};
-`;
-
-const PreviewContainer = styled.div`
-  height: 600px;
-  border: 1px solid ${props => props.theme.colors.border};
-  border-radius: ${props => props.theme.borderRadius.lg};
-  overflow: hidden;
-  
-  @media (max-width: 768px) {
-    height: 400px;
-  }
-`;
-
-const PreviewPlaceholder = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  background: ${props => props.theme.colors.background};
-  color: ${props => props.theme.colors.textSecondary};
-  text-align: center;
-  font-size: ${props => props.theme.typography.fontSize.lg};
-`;
-
-const ViewerNote = styled.div`
-  margin-top: ${props => props.theme.spacing.md};
-  font-size: ${props => props.theme.typography.fontSize.sm};
-  color: ${props => props.theme.colors.textSecondary};
+  overflow: auto;
+  padding: 2rem;
 `;
 
 const ImagePreview = styled.div`
-  height: 100%;
-`;
-
-const PDFPreview = styled.div`
-  height: 100%;
-`;
-
-const GenericPreview = styled.div`
-  height: 100%;
-`;
-
-const DocumentSidebar = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${props => props.theme.spacing.lg};
-  overflow-y: auto;
-`;
-
-const InfoGrid = styled.div`
-  display: grid;
-  gap: ${props => props.theme.spacing.md};
-`;
-
-const InfoItem = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-`;
-
-const InfoLabel = styled.span`
-  font-weight: ${props => props.theme.typography.fontWeight.medium};
-  color: ${props => props.theme.colors.text};
-  font-size: ${props => props.theme.typography.fontSize.sm};
-`;
-
-const InfoValue = styled.span`
-  color: ${props => props.theme.colors.textSecondary};
-  font-size: ${props => props.theme.typography.fontSize.sm};
-  text-align: right;
-`;
-
-const DocumentDescription = styled.div`
-  margin-top: ${props => props.theme.spacing.lg};
-`;
-
-const DescriptionText = styled.p`
-  margin: ${props => props.theme.spacing.sm} 0 0 0;
-  color: ${props => props.theme.colors.textSecondary};
-  font-size: ${props => props.theme.typography.fontSize.sm};
-  line-height: 1.5;
-`;
-
-const DocumentTagsSection = styled.div`
-  margin-top: ${props => props.theme.spacing.lg};
-`;
-
-const TagsList = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: ${props => props.theme.spacing.xs};
-  margin-top: ${props => props.theme.spacing.sm};
-`;
-
-const DocumentTag = styled.span`
-  padding: 2px 6px;
-  background: ${props => props.theme.colors.primary}20;
-  color: ${props => props.theme.colors.primary};
-  border-radius: ${props => props.theme.borderRadius.sm};
-  font-size: ${props => props.theme.typography.fontSize.xs};
-`;
-
-const CommentsSection = styled.div`
-  max-height: 500px;
-  overflow-y: auto;
-`;
-
-const CommentsList = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${props => props.theme.spacing.md};
-  margin-bottom: ${props => props.theme.spacing.lg};
-`;
-
-const CommentItem = styled.div<{ $type: string }>`
-  padding: ${props => props.theme.spacing.md};
-  background: ${props => props.theme.colors.background};
-  border-radius: ${props => props.theme.borderRadius.md};
-  border-left: 3px solid ${props => {
-    const colors = {
-      comment: '#3B82F6',
-      suggestion: '#F59E0B',
-      approval: '#10B981',
-      rejection: '#EF4444'
-    };
-    return colors[props.$type as keyof typeof colors] || '#3B82F6';
-  }};
-`;
-
-const CommentHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: ${props => props.theme.spacing.sm};
-`;
-
-const CommentAuthor = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${props => props.theme.spacing.xs};
-  font-weight: ${props => props.theme.typography.fontWeight.medium};
-  color: ${props => props.theme.colors.text};
-  font-size: ${props => props.theme.typography.fontSize.sm};
-`;
-
-const CommentIcon = styled.span`
-  font-size: ${props => props.theme.typography.fontSize.sm};
-`;
-
-const CommentTime = styled.span`
-  font-size: ${props => props.theme.typography.fontSize.xs};
-  color: ${props => props.theme.colors.textSecondary};
-`;
-
-const CommentContent = styled.p`
-  margin: 0;
-  color: ${props => props.theme.colors.text};
-  font-size: ${props => props.theme.typography.fontSize.sm};
-  line-height: 1.4;
-`;
-
-const CommentActions = styled.div`
-  margin-top: ${props => props.theme.spacing.sm};
-  display: flex;
-  gap: ${props => props.theme.spacing.sm};
-`;
-
-const CommentActionButton = styled.button`
-  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
-  border: 1px solid ${props => props.theme.colors.border};
-  background: ${props => props.theme.colors.background};
-  color: ${props => props.theme.colors.text};
-  border-radius: ${props => props.theme.borderRadius.sm};
-  cursor: pointer;
-  font-size: ${props => props.theme.typography.fontSize.xs};
+  text-align: center;
   
-  &:hover {
-    background: ${props => props.theme.colors.surface};
+  img {
+    max-width: 100%;
+    max-height: 600px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   }
 `;
 
-const EmptyComments = styled.div`
+const PDFPreview = styled.div`
+  iframe {
+    border: none;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+`;
+
+const TextPreview = styled.div`
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 1.5rem;
+  
+  pre {
+    color: #fff;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    margin: 0;
+  }
+`;
+
+const NoPreview = styled.div`
   text-align: center;
-  color: ${props => props.theme.colors.textSecondary};
-  font-size: ${props => props.theme.typography.fontSize.sm};
-  padding: ${props => props.theme.spacing.xl};
+  padding: 3rem;
+  color: #8b8b8b;
+`;
+
+const NoPreviewIcon = styled.div`
+  font-size: 3rem;
+  margin-bottom: 1rem;
+`;
+
+const NoPreviewTitle = styled.h3`
+  margin: 0 0 0.5rem 0;
+  color: #8b8b8b;
+`;
+
+const NoPreviewDescription = styled.p`
+  margin: 0 0 2rem 0;
+  font-size: 0.875rem;
+`;
+
+const CommentsSection = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
 `;
 
 const AddCommentForm = styled.div`
-  border-top: 1px solid ${props => props.theme.colors.border};
-  padding-top: ${props => props.theme.spacing.lg};
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 1.5rem;
 `;
 
 const CommentTypeSelector = styled.div`
   display: flex;
-  margin-bottom: ${props => props.theme.spacing.md};
-  background: ${props => props.theme.colors.background};
-  border-radius: ${props => props.theme.borderRadius.md};
-  overflow: hidden;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
 `;
 
-const CommentTypeButton = styled.button<{ $isActive: boolean }>`
-  flex: 1;
-  padding: ${props => props.theme.spacing.sm};
-  border: none;
-  background: ${props => props.$isActive 
-    ? props.theme.colors.primary 
-    : 'transparent'
+const TypeButton = styled.button<{ $active?: boolean }>`
+  padding: 0.5rem 1rem;
+  background: ${props => props.$active 
+    ? 'rgba(103, 126, 234, 0.2)' 
+    : 'rgba(255, 255, 255, 0.05)'
   };
-  color: ${props => props.$isActive 
-    ? 'white' 
-    : props.theme.colors.text
+  border: 1px solid ${props => props.$active 
+    ? 'rgba(103, 126, 234, 0.4)' 
+    : 'rgba(255, 255, 255, 0.1)'
   };
+  border-radius: 6px;
+  color: ${props => props.$active ? '#667eea' : '#8b8b8b'};
+  font-family: inherit;
+  font-size: 0.875rem;
   cursor: pointer;
-  transition: all ${props => props.theme.transitions.fast};
-  font-size: ${props => props.theme.typography.fontSize.sm};
+  transition: all 0.2s;
 
   &:hover {
-    background: ${props => props.$isActive 
-      ? props.theme.colors.primary 
-      : props.theme.colors.surface
-    };
+    background: rgba(255, 255, 255, 0.1);
   }
 `;
 
 const CommentTextarea = styled.textarea`
   width: 100%;
-  padding: ${props => props.theme.spacing.md};
-  border: 1px solid ${props => props.theme.colors.border};
-  border-radius: ${props => props.theme.borderRadius.md};
-  background: ${props => props.theme.colors.background};
-  color: ${props => props.theme.colors.text};
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #fff;
   font-family: inherit;
-  font-size: ${props => props.theme.typography.fontSize.sm};
+  font-size: 0.875rem;
   resize: vertical;
-  
-  &:focus {
-    outline: none;
-    border-color: ${props => props.theme.colors.primary};
-  }
+  margin-bottom: 1rem;
 
   &::placeholder {
-    color: ${props => props.theme.colors.textSecondary};
+    color: #8b8b8b;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: rgba(103, 126, 234, 0.4);
   }
 `;
 
-// Approval Modal
-const ApprovalModal = styled.div`
+const CommentActions = styled.div`
+  display: flex;
+  justify-content: flex-end;
+`;
+
+const CommentsList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+`;
+
+const CommentItem = styled.div<{ $type: string }>`
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-left: 3px solid ${props => {
+    switch (props.$type) {
+      case 'suggestion': return '#f59e0b';
+      case 'approval': return '#22c55e';
+      case 'rejection': return '#ef4444';
+      default: return '#667eea';
+    }
+  }};
+  border-radius: 8px;
+`;
+
+const CommentHeader = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+`;
+
+const CommentAuthor = styled.div`
+  color: #fff;
+  font-weight: 500;
+  font-size: 0.875rem;
+`;
+
+const CommentTime = styled.div`
+  color: #8b8b8b;
+  font-size: 0.75rem;
+`;
+
+const CommentTypeBadge = styled.div<{ $type: string }>`
+  margin-left: auto;
+`;
+
+const CommentContent = styled.div`
+  color: #8b8b8b;
+  font-size: 0.875rem;
+  line-height: 1.5;
+`;
+
+const CommentResolved = styled.div`
+  color: #22c55e;
+  font-size: 0.75rem;
+  margin-top: 0.5rem;
+`;
+
+const EmptyComments = styled.div`
+  text-align: center;
+  padding: 2rem;
+  color: #8b8b8b;
+`;
+
+const EmptyCommentsIcon = styled.div`
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+`;
+
+const EmptyCommentsText = styled.div`
+  font-size: 0.875rem;
+`;
+
+const HistorySection = styled.div``;
+
+const HistoryHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  
+  h4 {
+    margin: 0;
+    color: #fff;
+  }
+`;
+
+const VersionsList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+`;
+
+const VersionItem = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+`;
+
+const VersionNumber = styled.div`
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  background: rgba(103, 126, 234, 0.2);
+  color: #667eea;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+`;
+
+const VersionInfo = styled.div`
+  flex: 1;
+`;
+
+const VersionDate = styled.div`
+  color: #fff;
+  font-size: 0.875rem;
+`;
+
+const VersionAuthor = styled.div`
+  color: #8b8b8b;
+  font-size: 0.75rem;
+`;
+
+const VersionActions = styled.div``;
+
+const EmptyHistory = styled.div`
+  text-align: center;
+  padding: 2rem;
+  color: #8b8b8b;
+`;
+
+const EmptyHistoryIcon = styled.div`
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+`;
+
+const EmptyHistoryText = styled.div`
+  font-size: 0.875rem;
+`;
+
+const ApprovalDialog = styled.div`
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
+  z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
 `;
 
-const ApprovalModalContent = styled.div`
-  background: ${props => props.theme.colors.surface};
-  padding: ${props => props.theme.spacing['2xl']};
-  border-radius: ${props => props.theme.borderRadius.lg};
-  min-width: 500px;
+const DialogOverlay = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+`;
+
+const DialogContent = styled.div`
+  position: relative;
+  background: #1a1a2e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  width: 500px;
   max-width: 90vw;
 `;
 
-const ApprovalModalHeader = styled.div`
-  margin-bottom: ${props => props.theme.spacing.xl};
-  
-  h3 {
-    margin: 0 0 ${props => props.theme.spacing.sm} 0;
-    color: ${props => props.theme.colors.text};
-  }
-  
-  p {
-    margin: 0;
-    color: ${props => props.theme.colors.textSecondary};
-  }
+const DialogHeader = styled.div`
+  padding: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 `;
 
-const ApprovalForm = styled.div`
-  margin-bottom: ${props => props.theme.spacing.xl};
+const DialogTitle = styled.h3`
+  margin: 0;
+  color: #fff;
 `;
 
-const ApprovalModalActions = styled.div`
+const DialogBody = styled.div`
+  padding: 1.5rem;
+`;
+
+const ActionSelector = styled.div`
   display: flex;
-  gap: ${props => props.theme.spacing.md};
-  justify-content: flex-end;
+  gap: 1rem;
+  margin-bottom: 1rem;
 `;
+
+const ActionButton = styled.button<{ $active?: boolean }>`
+  flex: 1;
+  padding: 0.75rem;
+  background: ${props => props.$active 
+    ? 'rgba(103, 126, 234, 0.2)' 
+    : 'rgba(255, 255, 255, 0.05)'
+  };
+  border: 1px solid ${props => props.$active 
+    ? 'rgba(103, 126, 234, 0.4)' 
+    : 'rgba(255, 255, 255, 0.1)'
+  };
+  border-radius: 6px;
+  color: ${props => props.$active ? '#667eea' : '#8b8b8b'};
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+`;
+
+const DialogActions = styled.div`
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  padding: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+`;
+
+export default DocumentViewer;

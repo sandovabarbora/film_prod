@@ -206,3 +206,20 @@ class ProductionAccessViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         serializer.save(granted_by=self.request.user)
+
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
+from django.middleware.csrf import get_token
+
+@ensure_csrf_cookie
+@require_http_methods(["GET"])
+def get_csrf_token(request):
+    """
+    Endpoint pro získání CSRF cookie a tokenu
+    Volat před jakýmkoli POST requestem
+    """
+    return JsonResponse({
+        'csrf_token': get_token(request),
+        'status': 'success'
+    })

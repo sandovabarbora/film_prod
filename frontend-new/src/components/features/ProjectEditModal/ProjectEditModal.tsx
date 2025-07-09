@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import styled from 'styled-components';
 import { X, Save, Calendar, DollarSign, MapPin, Film } from 'lucide-react';
+import { CrewSelector } from '../CrewManagement';
 
 interface ProjectFormData {
   title: string;
@@ -8,8 +9,9 @@ interface ProjectFormData {
   status: string;
   start_date: string;
   end_date: string;
-  budget_total: number | string;
+  budget: number | string;
   location_primary: string;
+  crew_members?: string[];
 }
 
 interface ProjectEditModalProps {
@@ -19,6 +21,14 @@ interface ProjectEditModalProps {
   project?: any;
   isEditing?: boolean;
 }
+
+// Status mapping synchronizovaný s Django backendem
+const STATUS_CHOICES = [
+  { value: 'prep', label: 'Příprava', description: 'Pre-production' },
+  { value: 'shoot', label: 'Natáčení', description: 'Principal Photography' },
+  { value: 'post', label: 'Postprodukce', description: 'Post-production' },
+  { value: 'wrap', label: 'Dokončeno', description: 'Wrapped' },
+] as const;
 
 const ModalOverlay = styled.div<{ $isOpen: boolean }>`
   position: fixed;
@@ -42,7 +52,7 @@ const ModalContent = styled.div<{ $isOpen: boolean }>`
   border: 1px solid ${({ theme }) => theme.colors.border};
   border-radius: 20px;
   padding: 2rem;
-  max-width: 600px;
+  max-width: 700px;
   width: 90vw;
   max-height: 90vh;
   overflow-y: auto;
@@ -248,11 +258,12 @@ const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
   const [formData, setFormData] = useState<ProjectFormData>({
     title: project?.title || '',
     description: project?.description || '',
-    status: project?.status || 'development',
+    status: project?.status || 'prep',
     start_date: project?.start_date || '',
     end_date: project?.end_date || '',
-    budget_total: project?.budget_total || '',
+    budget: project?.budget || project?.budget_total || '',
     location_primary: project?.location_primary || '',
+    crew_members: project?.crew_members || [],
   });
 
   const [isLoading, setIsLoading] = useState(false);
@@ -265,11 +276,19 @@ const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
     }));
   };
 
+  const handleCrewChange = (crewIds: string[]) => {
+    setFormData(prev => ({
+      ...prev,
+      crew_members: crewIds
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     
     try {
+      console.log('🎯 Saving project with crew:', formData);
       await onSave(formData);
       onClose();
     } catch (error) {
@@ -329,12 +348,11 @@ const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
                 value={formData.status}
                 onChange={handleInputChange}
               >
-                <option value="development">Vývoj</option>
-                <option value="pre_production">Příprava</option>
-                <option value="production">Natáčení</option>
-                <option value="post_production">Postprodukce</option>
-                <option value="completed">Dokončeno</option>
-                <option value="cancelled">Zrušeno</option>
+                {STATUS_CHOICES.map(status => (
+                  <option key={status.value} value={status.value}>
+                    {status.label}
+                  </option>
+                ))}
               </Select>
             </FormGroup>
 
@@ -345,8 +363,8 @@ const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
               </Label>
               <Input
                 type="number"
-                name="budget_total"
-                value={formData.budget_total}
+                name="budget"
+                value={formData.budget}
                 onChange={handleInputChange}
                 placeholder="5000000"
                 min="0"
@@ -396,6 +414,16 @@ const ProjectEditModal: React.FC<ProjectEditModalProps> = ({
               onChange={handleInputChange}
               placeholder="Praha, Česká republika"
               required
+            />
+          </FormGroup>
+
+          <FormGroup>
+            <CrewSelector
+              selectedCrew={formData.crew_members || []}
+              onCrewChange={handleCrewChange}
+              maxSelections={15}
+              title="Štáb projektu"
+              subtitle="Vyberte členy štábu pro tento projekt nebo přidejte nové"
             />
           </FormGroup>
 

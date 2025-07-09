@@ -1,354 +1,283 @@
-// src/components/ui/Button/Button.tsx - Cinema Grade Buttons
 import React, { ButtonHTMLAttributes, ReactNode } from 'react';
 import styled, { css } from 'styled-components';
 
-type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'glass' | 'gradient' | 'danger';
-type ButtonSize = 'sm' | 'md' | 'lg' | 'xl';
-
-interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'size'> {
-  variant?: ButtonVariant;
-  size?: ButtonSize;
-  isLoading?: boolean;
-  leftIcon?: ReactNode;
-  rightIcon?: ReactNode;
-  fullWidth?: boolean;
-  glow?: boolean;
-  shimmer?: boolean;
-  children: ReactNode;
+// ✅ Use $ prefix for styled-components props to avoid DOM forwarding
+interface StyledButtonProps {
+  $variant: 'primary' | 'secondary' | 'outline' | 'danger' | 'ghost' | 'glass' | 'gradient';
+  $size: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  $fullWidth: boolean;
+  $isLoading: boolean;
+  $glow: boolean;
+  $shimmer: boolean;
 }
 
-export function Button({
-  variant = 'primary',
-  size = 'md',
-  isLoading = false,
-  leftIcon,
-  rightIcon,
-  fullWidth = false,
-  glow = false,
-  shimmer = false,
-  children,
-  disabled,
-  className = '',
-  ...props
-}: ButtonProps) {
-  const buttonClass = `
-    ${className}
-    ${shimmer ? 'shimmer' : ''}
-    ${glow ? 'glow' : ''}
-  `.trim();
-
-  return (
-    <StyledButton
-      variant={variant}
-      size={size}
-      fullWidth={fullWidth}
-      disabled={disabled || isLoading}
-      className={buttonClass}
-      {...props}
-    >
-      {isLoading && <LoadingWrapper><LoadingSpinner /></LoadingWrapper>}
-      {!isLoading && leftIcon && <IconWrapper position="left">{leftIcon}</IconWrapper>}
-      <ContentWrapper isLoading={isLoading}>
-        {children}
-      </ContentWrapper>
-      {!isLoading && rightIcon && <IconWrapper position="right">{rightIcon}</IconWrapper>}
-      {shimmer && <ShimmerEffect />}
-    </StyledButton>
-  );
-}
-
-// Specialized variant functions
-export function PrimaryButton(props: Omit<ButtonProps, 'variant'>) {
-  return <Button variant="primary" {...props} />;
-}
-
-export function SecondaryButton(props: Omit<ButtonProps, 'variant'>) {
-  return <Button variant="secondary" {...props} />;
-}
-
-export function DangerButton(props: Omit<ButtonProps, 'variant'>) {
-  return <Button variant="danger" {...props} />;
-}
-
-export function OutlineButton(props: Omit<ButtonProps, 'variant'>) {
-  return <Button variant="outline" {...props} />;
-}
-
-export function GhostButton(props: Omit<ButtonProps, 'variant'>) {
-  return <Button variant="ghost" {...props} />;
-}
-
-export function GlassButton(props: Omit<ButtonProps, 'variant'>) {
-  return <Button variant="glass" shimmer {...props} />;
-}
-
-export function GradientButton(props: Omit<ButtonProps, 'variant'>) {
-  return <Button variant="gradient" glow {...props} />;
-}
-
-// Styled components helpers
-const getVariantStyles = (variant: ButtonVariant) => {
-  const variants = {
-    primary: css`
-      background: ${props => props.theme.colors.primary};
-      color: white;
-      border: 2px solid ${props => props.theme.colors.primary};
-
-      &:hover:not(:disabled) {
-        background: ${props => props.theme.colors.primaryDark || props.theme.colors.primary};
-        border-color: ${props => props.theme.colors.primaryDark || props.theme.colors.primary};
-        transform: translateY(-3px);
-        box-shadow: ${props => props.theme.shadows.lg};
-      }
-
-      &:active:not(:disabled) {
-        transform: translateY(-1px);
-      }
-    `,
-
-    secondary: css`
-      background: ${props => props.theme.colors.surface};
-      color: ${props => props.theme.colors.text};
-      border: 2px solid ${props => props.theme.colors.border};
-
-      &:hover:not(:disabled) {
-        background: ${props => props.theme.colors.background};
-        border-color: ${props => props.theme.colors.primary};
-        transform: translateY(-2px);
-        box-shadow: ${props => props.theme.shadows.md};
-      }
-
-      &:active:not(:disabled) {
-        transform: translateY(0);
-      }
-    `,
-
-    outline: css`
-      background: transparent;
-      color: ${props => props.theme.colors.primary};
-      border: 2px solid ${props => props.theme.colors.primary};
-
-      &:hover:not(:disabled) {
-        background: ${props => props.theme.colors.primary};
-        color: white;
-        transform: translateY(-2px);
-        box-shadow: ${props => props.theme.shadows.md};
-      }
-
-      &:active:not(:disabled) {
-        transform: translateY(0);
-      }
-    `,
-
-    ghost: css`
-      background: transparent;
-      color: ${props => props.theme.colors.text};
-      border: 2px solid transparent;
-
-      &:hover:not(:disabled) {
-        background: ${props => props.theme.colors.surface};
-        color: ${props => props.theme.colors.primary};
-        transform: translateY(-1px);
-      }
-
-      &:active:not(:disabled) {
-        transform: translateY(0);
-      }
-    `,
-
-    glass: css`
-      background: ${props => props.theme.glass?.light?.background || 'rgba(255, 255, 255, 0.1)'};
-      backdrop-filter: blur(10px);
-      color: ${props => props.theme.colors.text};
-      border: 2px solid ${props => props.theme.glass?.light?.border || 'rgba(255, 255, 255, 0.2)'};
-
-      &:hover:not(:disabled) {
-        background: ${props => props.theme.glass?.medium?.background || 'rgba(255, 255, 255, 0.2)'};
-        transform: translateY(-3px);
-        box-shadow: ${props => props.theme.shadows.xl};
-      }
-
-      &.shimmer::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: -100%;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-        animation: shimmer 2s infinite;
-      }
-    `,
-
-    gradient: css`
-      background: linear-gradient(135deg, ${props => props.theme.colors.primary}, ${props => props.theme.colors.secondary});
-      color: white;
-      border: 2px solid transparent;
-      position: relative;
-      overflow: hidden;
-
-      &:hover:not(:disabled) {
-        background: linear-gradient(135deg, ${props => props.theme.colors.secondary}, ${props => props.theme.colors.primary});
-        transform: translateY(-4px) scale(1.02);
-        box-shadow: ${props => props.theme.shadows.xl};
-      }
-
-      &.glow {
-        animation: glow 2s ease-in-out infinite;
-      }
-    `,
-
-    danger: css`
-      background: ${props => props.theme.colors.error};
-      color: white;
-      border: 2px solid ${props => props.theme.colors.error};
-
-      &:hover:not(:disabled) {
-        background: #dc2626;
-        border-color: #dc2626;
-        transform: translateY(-2px);
-        box-shadow: 0 10px 25px rgba(220, 38, 38, 0.3);
-      }
-
-      &:active:not(:disabled) {
-        transform: translateY(0);
-      }
-    `,
-  };
-
-  return variants[variant];
-};
-
-const getSizeStyles = (size: ButtonSize) => {
-  const sizes = {
-    sm: css`
-      padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.lg};
-      font-size: ${props => props.theme.typography.fontSize.sm};
-      min-height: 36px;
-      border-radius: ${props => props.theme.borderRadius.lg};
-    `,
-    md: css`
-      padding: ${props => props.theme.spacing.md} ${props => props.theme.spacing.xl};
-      font-size: ${props => props.theme.typography.fontSize.base || props.theme.typography.fontSize.md};
-      min-height: 44px;
-      border-radius: ${props => props.theme.borderRadius.xl};
-    `,
-    lg: css`
-      padding: ${props => props.theme.spacing.lg} ${props => props.theme.spacing['2xl']};
-      font-size: ${props => props.theme.typography.fontSize.lg};
-      min-height: 52px;
-      border-radius: ${props => props.theme.borderRadius['2xl']};
-    `,
-    xl: css`
-      padding: ${props => props.theme.spacing.xl} ${props => props.theme.spacing['3xl']};
-      font-size: ${props => props.theme.typography.fontSize.xl};
-      min-height: 60px;
-      border-radius: ${props => props.theme.borderRadius['2xl']};
-    `,
-  };
-
-  return sizes[size];
-};
-
-// Main styled components
-const StyledButton = styled.button<{
-  variant: ButtonVariant;
-  size: ButtonSize;
-  fullWidth: boolean;
-}>`
+const StyledButton = styled.button<StyledButtonProps>`
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: ${props => props.theme.spacing.sm};
-  font-family: ${props => props.theme.typography.fontFamily.sans};
-  font-weight: ${props => props.theme.typography.fontWeight.medium};
-  line-height: 1;
-  text-decoration: none;
-  white-space: nowrap;
-  transition: all ${props => props.theme.transitions.normal};
+  gap: ${({ theme }) => theme?.spacing?.sm || '0.5rem'};
+  border: none;
+  border-radius: ${({ theme }) => theme?.borderRadius?.md || '0.375rem'};
+  font-family: inherit;
+  font-weight: ${({ theme }) => theme?.typography?.weights?.medium || theme?.typography?.fontWeight?.medium || 500};
   cursor: pointer;
-  user-select: none;
+  transition: all 0.2s ease;
   position: relative;
   overflow: hidden;
+  text-decoration: none;
+  outline: none;
   
-  ${props => getVariantStyles(props.variant)}
-  ${props => getSizeStyles(props.size)}
+  /* Size variants */
+  ${({ $size }) => {
+    switch ($size) {
+      case 'xs':
+        return css`
+          padding: 0.25rem 0.5rem;
+          font-size: 0.75rem;
+          min-height: 28px;
+        `;
+      case 'sm':
+        return css`
+          padding: 0.5rem 0.75rem;
+          font-size: 0.875rem;
+          min-height: 36px;
+        `;
+      case 'md':
+        return css`
+          padding: 0.5rem 1rem;
+          font-size: 0.875rem;
+          min-height: 40px;
+        `;
+      case 'lg':
+        return css`
+          padding: 0.75rem 1.5rem;
+          font-size: 1rem;
+          min-height: 48px;
+        `;
+      case 'xl':
+        return css`
+          padding: 1rem 2rem;
+          font-size: 1.125rem;
+          min-height: 56px;
+        `;
+      default:
+        return css`
+          padding: 0.5rem 1rem;
+          font-size: 0.875rem;
+          min-height: 40px;
+        `;
+    }
+  }}
   
-  ${props => props.fullWidth && css`
+  /* Color variants */
+  ${({ $variant, theme }) => {
+    const colors = {
+      primary: {
+        bg: theme?.colors?.accent?.primary || theme?.colors?.primary || '#3182ce',
+        hover: theme?.colors?.accent?.dark || theme?.colors?.primaryDark || '#2c5282',
+        text: '#ffffff',
+        border: theme?.colors?.accent?.primary || theme?.colors?.primary || '#3182ce'
+      },
+      secondary: {
+        bg: theme?.colors?.surface?.elevated || '#f7fafc',
+        hover: theme?.colors?.surface?.hover || '#edf2f7',
+        text: theme?.colors?.text?.primary || '#1a202c',
+        border: theme?.colors?.border?.primary || '#e2e8f0'
+      },
+      outline: {
+        bg: 'transparent',
+        hover: theme?.colors?.surface?.elevated || '#f7fafc',
+        text: theme?.colors?.text?.primary || '#1a202c',
+        border: theme?.colors?.border?.primary || '#e2e8f0'
+      },
+      danger: {
+        bg: theme?.colors?.error?.primary || '#e53e3e',
+        hover: theme?.colors?.error?.dark || '#c53030',
+        text: '#ffffff',
+        border: theme?.colors?.error?.primary || '#e53e3e'
+      },
+      ghost: {
+        bg: 'transparent',
+        hover: theme?.colors?.surface?.elevated || 'rgba(0, 0, 0, 0.05)',
+        text: theme?.colors?.text?.primary || '#1a202c',
+        border: 'transparent'
+      },
+      glass: {
+        bg: 'rgba(255, 255, 255, 0.1)',
+        hover: 'rgba(255, 255, 255, 0.2)',
+        text: theme?.colors?.text?.primary || '#1a202c',
+        border: 'rgba(255, 255, 255, 0.2)'
+      },
+      gradient: {
+        bg: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        hover: 'linear-gradient(135deg, #764ba2 0%, #667eea 100%)',
+        text: '#ffffff',
+        border: 'transparent'
+      }
+    };
+    
+    const color = colors[$variant] || colors.primary;
+    
+    return css`
+      background: ${color.bg};
+      color: ${color.text};
+      border: 1px solid ${color.border};
+      
+      &:hover:not(:disabled) {
+        background: ${color.hover};
+        transform: translateY(-1px);
+        box-shadow: ${theme?.shadows?.md || '0 4px 6px -1px rgba(0, 0, 0, 0.1)'};
+      }
+      
+      &:active:not(:disabled) {
+        transform: translateY(0);
+      }
+    `;
+  }}
+  
+  /* Full width */
+  ${({ $fullWidth }) => $fullWidth && css`
     width: 100%;
   `}
-
+  
+  /* Loading state */
+  ${({ $isLoading }) => $isLoading && css`
+    pointer-events: none;
+    opacity: 0.7;
+  `}
+  
+  /* Glow effect */
+  ${({ $glow, theme }) => $glow && css`
+    box-shadow: 0 0 20px ${theme?.colors?.accent?.primary || '#3182ce'}40;
+    animation: glow 2s ease-in-out infinite alternate;
+    
+    @keyframes glow {
+      from { box-shadow: 0 0 20px ${theme?.colors?.accent?.primary || '#3182ce'}40; }
+      to { box-shadow: 0 0 30px ${theme?.colors?.accent?.primary || '#3182ce'}60; }
+    }
+  `}
+  
+  /* Shimmer effect */
+  ${({ $shimmer }) => $shimmer && css`
+    &::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+      animation: shimmer 2s infinite;
+    }
+    
+    @keyframes shimmer {
+      0% { left: -100%; }
+      100% { left: 100%; }
+    }
+  `}
+  
+  /* Disabled state */
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-    transform: none !important;
-    box-shadow: none !important;
+    transform: none;
   }
-
-  &:focus {
-    outline: none;
-    ring: 2px solid ${props => props.theme.colors.primary}40;
-  }
-
-  @keyframes shimmer {
-    0% { left: -100%; }
-    100% { left: 100%; }
-  }
-
-  @keyframes glow {
-    0%, 100% { 
-      box-shadow: ${props => props.theme.shadows.lg}; 
-    }
-    50% { 
-      box-shadow: 
-        ${props => props.theme.shadows.xl},
-        0 0 30px ${props => props.theme.colors.primary}40; 
-    }
+  
+  &:focus-visible {
+    box-shadow: 0 0 0 3px ${({ theme, $variant }) => 
+      $variant === 'primary' 
+        ? theme?.colors?.accent?.muted || 'rgba(49, 130, 206, 0.3)'
+        : theme?.colors?.text?.muted || 'rgba(0, 0, 0, 0.1)'
+    };
   }
 `;
 
-const LoadingWrapper = styled.div`
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-`;
-
-const LoadingSpinner = styled.div`
+const LoadingSpinner = styled.span`
+  display: inline-block;
   width: 16px;
   height: 16px;
   border: 2px solid transparent;
   border-top: 2px solid currentColor;
   border-radius: 50%;
   animation: spin 1s linear infinite;
-
+  
   @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    to { transform: rotate(360deg); }
   }
 `;
 
-const ContentWrapper = styled.span<{ isLoading: boolean }>`
-  opacity: ${props => props.isLoading ? 0 : 1};
-  transition: opacity ${props => props.theme.transitions.fast};
-`;
+interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'type' | 'size'> {
+  variant?: 'primary' | 'secondary' | 'outline' | 'danger' | 'ghost' | 'glass' | 'gradient';
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+  fullWidth?: boolean;
+  isLoading?: boolean;
+  leftIcon?: ReactNode;
+  rightIcon?: ReactNode;
+  glow?: boolean;
+  shimmer?: boolean;
+  children: ReactNode;
+  type?: 'button' | 'submit' | 'reset';
+}
 
-const IconWrapper = styled.span<{ position: 'left' | 'right' }>`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.1em;
-`;
+export const Button: React.FC<ButtonProps> = ({
+  variant = 'primary',
+  size = 'md',
+  fullWidth = false,
+  isLoading = false,
+  leftIcon,
+  rightIcon,
+  glow = false,
+  shimmer = false,
+  children,
+  type = 'button',
+  disabled,
+  ...props
+}) => {
+  return (
+    <StyledButton
+      $variant={variant}
+      $size={size}
+      $fullWidth={fullWidth}
+      $isLoading={isLoading}
+      $glow={glow}
+      $shimmer={shimmer}
+      type={type}
+      disabled={disabled || isLoading}
+      {...props}
+    >
+      {isLoading && <LoadingSpinner />}
+      {!isLoading && leftIcon && <span>{leftIcon}</span>}
+      <span>{children}</span>
+      {!isLoading && rightIcon && <span>{rightIcon}</span>}
+    </StyledButton>
+  );
+};
 
-const ShimmerEffect = styled.div`
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-  animation: shimmer 2s infinite;
-  pointer-events: none;
-`;
+// ✅ Backward compatibility - wrapper components
+export const PrimaryButton: React.FC<Omit<ButtonProps, 'variant'>> = (props) => (
+  <Button variant="primary" {...props} />
+);
 
-export default Button;
+export const SecondaryButton: React.FC<Omit<ButtonProps, 'variant'>> = (props) => (
+  <Button variant="secondary" {...props} />
+);
+
+export const OutlineButton: React.FC<Omit<ButtonProps, 'variant'>> = (props) => (
+  <Button variant="outline" {...props} />
+);
+
+export const DangerButton: React.FC<Omit<ButtonProps, 'variant'>> = (props) => (
+  <Button variant="danger" {...props} />
+);
+
+export const GhostButton: React.FC<Omit<ButtonProps, 'variant'>> = (props) => (
+  <Button variant="ghost" {...props} />
+);
+
+export const GlassButton: React.FC<Omit<ButtonProps, 'variant'>> = (props) => (
+  <Button variant="glass" shimmer {...props} />
+);
+
+export const GradientButton: React.FC<Omit<ButtonProps, 'variant'>> = (props) => (
+  <Button variant="gradient" glow {...props} />
+);

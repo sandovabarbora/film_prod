@@ -1,5 +1,4 @@
-// Layout barrel exports
-export { Sidebar, useSidebar, SidebarToggle } from './Sidebar';
-export { AppLayout, ControlledAppLayout, useSidebarLayout } from './AppLayout';
-export { Container, PageContainer, Section, Grid } from './Container';
-export { ProtectedRoute } from './ProtectedRoute';
+export { default as AppLayout } from './AppLayout';
+export { default as ProtectedRoute } from './ProtectedRoute';
+export { Sidebar } from './Sidebar';
+export { Container } from './Container';

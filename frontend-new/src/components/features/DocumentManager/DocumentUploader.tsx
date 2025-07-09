@@ -1,67 +1,65 @@
 import React, { useState, useRef } from 'react';
 import styled from 'styled-components';
-import { Card, GlassCard, CardHeader, CardContent } from '../../ui/Card';
-import { PrimaryButton, SecondaryButton, OutlineButton } from '../../ui/Button';
-
-interface Document {
-  id: string;
-  title: string;
-  filename: string;
-  type: string;
-}
+import { Card } from '../../ui/Card';
+import { Button } from '../../ui/Button';
 
 interface DocumentUploaderProps {
-  projectId: string;
-  onUploadSuccess: (file: File, metadata: any) => void;
+  onUpload: (files: File[], metadata: DocumentMetadata) => void;
   onCancel: () => void;
+  acceptedTypes?: string[];
+  maxFileSize?: number; // bytes
+  maxFiles?: number;
   currentUser: {
     name: string;
     role: string;
     permissions: string[];
   };
-  existingDocuments: Document[];
 }
 
-export function DocumentUploader({ 
-  projectId,
-  onUploadSuccess, 
+interface DocumentMetadata {
+  title: string;
+  description: string;
+  type: 'script' | 'schedule' | 'budget' | 'contract' | 'technical' | 'legal' | 'creative' | 'other';
+  tags: string[];
+  isConfidential: boolean;
+  approvalRequired: boolean;
+  permissions: {
+    canView: string[];
+    canEdit: string[];
+    canApprove: string[];
+  };
+}
+
+export function DocumentUploader({
+  onUpload,
   onCancel,
-  currentUser,
-  existingDocuments
+  acceptedTypes = ['.pdf', '.doc', '.docx', '.txt', '.jpg', '.jpeg', '.png', '.mp4', '.mov'],
+  maxFileSize = 100 * 1024 * 1024, // 100MB
+  maxFiles = 10,
+  currentUser
 }: DocumentUploaderProps) {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Form data pro metadata
-  const [metadata, setMetadata] = useState({
+  // Metadata form state
+  const [metadata, setMetadata] = useState<DocumentMetadata>({
     title: '',
     description: '',
     type: 'other',
-    category: 'admin',
-    tags: '',
-    approvalRequired: false
+    tags: [],
+    isConfidential: false,
+    approvalRequired: false,
+    permissions: {
+      canView: [],
+      canEdit: [currentUser.name],
+      canApprove: []
+    }
   });
 
-  const documentTypes = [
-    { value: 'script', label: 'Scénář', icon: '📝' },
-    { value: 'contract', label: 'Smlouva', icon: '📄' },
-    { value: 'callsheet', label: 'Call Sheet', icon: '📋' },
-    { value: 'storyboard', label: 'Storyboard', icon: '🎨' },
-    { value: 'concept', label: 'Koncept', icon: '💡' },
-    { value: 'legal', label: 'Právní dokument', icon: '⚖️' },
-    { value: 'schedule', label: 'Harmonogram', icon: '📅' },
-    { value: 'other', label: 'Ostatní', icon: '📎' }
-  ];
-
-  const categories = [
-    { value: 'pre_production', label: 'Příprava' },
-    { value: 'production', label: 'Natáčení' },
-    { value: 'post_production', label: 'Postprodukce' },
-    { value: 'admin', label: 'Administrativa' },
-    { value: 'legal', label: 'Právní' }
-  ];
+  const [currentTag, setCurrentTag] = useState('');
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -77,478 +75,672 @@ export function DocumentUploader({
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const files = Array.from(e.dataTransfer.files);
-      setSelectedFiles(files);
-      
-      // Auto-fill title based on filename
-      if (files.length === 1 && !metadata.title) {
-        const filename = files[0].name;
-        const nameWithoutExt = filename.substring(0, filename.lastIndexOf('.'));
-        setMetadata(prev => ({ ...prev, title: nameWithoutExt }));
-      }
-    }
+
+    const droppedFiles = Array.from(e.dataTransfer.files);
+    handleFiles(droppedFiles);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const files = Array.from(e.target.files);
-      setSelectedFiles(files);
-      
-      // Auto-fill title based on filename
-      if (files.length === 1 && !metadata.title) {
-        const filename = files[0].name;
-        const nameWithoutExt = filename.substring(0, filename.lastIndexOf('.'));
-        setMetadata(prev => ({ ...prev, title: nameWithoutExt }));
-      }
+    const selectedFileList = e.target.files;
+    if (selectedFileList) {
+      const filesArray = Array.from(selectedFileList);
+      handleFiles(filesArray);
     }
   };
 
-  const formatFileSize = (bytes: number) => {
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    if (bytes === 0) return '0 B';
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+  const handleFiles = (files: File[]) => {
+    // Validate files
+    const validFiles = files.filter(file => {
+      if (file.size > maxFileSize) {
+        alert(`Soubor ${file.name} je příliš velký. Maximum je ${formatFileSize(maxFileSize)}.`);
+        return false;
+      }
+
+      const fileExtension = '.' + file.name.split('.').pop()?.toLowerCase();
+      if (!acceptedTypes.includes(fileExtension)) {
+        alert(`Soubor ${file.name} má nepodporovaný formát.`);
+        return false;
+      }
+
+      return true;
+    });
+
+    if (selectedFiles.length + validFiles.length > maxFiles) {
+      alert(`Můžete nahrát maximálně ${maxFiles} souborů.`);
+      return;
+    }
+
+    setSelectedFiles(prev => [...prev, ...validFiles].slice(0, maxFiles));
+
+    // Auto-fill title if only one file
+    if (validFiles.length === 1 && !metadata.title) {
+      setMetadata(prev => ({
+        ...prev,
+        title: validFiles[0].name.replace(/\.[^/.]+$/, '')
+      }));
+    }
   };
 
-  const validateForm = () => {
-    if (selectedFiles.length === 0) return 'Vyberte soubor k nahrání';
-    if (!metadata.title.trim()) return 'Zadejte název dokumentu';
-    
-    // Check for duplicate filenames
-    const isDuplicate = existingDocuments.some(doc => 
-      doc.filename === selectedFiles[0].name
-    );
-    if (isDuplicate) return 'Soubor s tímto názvem již existuje';
-    
-    return null;
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const addTag = () => {
+    if (currentTag.trim() && !metadata.tags.includes(currentTag.trim())) {
+      setMetadata(prev => ({
+        ...prev,
+        tags: [...prev.tags, currentTag.trim()]
+      }));
+      setCurrentTag('');
+    }
+  };
+
+  const removeTag = (tagToRemove: string) => {
+    setMetadata(prev => ({
+      ...prev,
+      tags: prev.tags.filter(tag => tag !== tagToRemove)
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const error = validateForm();
-    if (error) {
-      alert(error);
+    if (selectedFiles.length === 0) {
+      alert('Vyberte alespoň jeden soubor');
+      return;
+    }
+
+    if (!metadata.title.trim()) {
+      alert('Zadejte název dokumentu');
       return;
     }
 
     setUploading(true);
-    
+    setUploadProgress(0);
+
     try {
-      // Process tags
-      const tags = metadata.tags
-        .split(',')
-        .map(tag => tag.trim())
-        .filter(tag => tag.length > 0);
+      // Simulate upload progress
+      for (let i = 0; i <= 100; i += 10) {
+        setUploadProgress(i);
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
 
-      const docMetadata = {
-        ...metadata,
-        tags,
-        uploadedBy: currentUser.name,
-        uploadedAt: new Date().toISOString(),
-        status: 'draft',
-        version: '1.0'
-      };
-
-      await onUploadSuccess(selectedFiles[0], docMetadata);
+      await onUpload(selectedFiles, metadata);
     } catch (error) {
       console.error('Upload failed:', error);
-      alert('Nahrávání se nezdařilo. Zkuste to znovu.');
+      alert('Nahrávání se nezdařilo');
     } finally {
       setUploading(false);
+      setUploadProgress(0);
     }
   };
 
-  const removeFile = (index: number) => {
-    setSelectedFiles(files => files.filter((_, i) => i !== index));
-  };
+  const documentTypes = [
+    { value: 'script', label: 'Scénář' },
+    { value: 'schedule', label: 'Harmonogram' },
+    { value: 'budget', label: 'Rozpočet' },
+    { value: 'contract', label: 'Smlouva' },
+    { value: 'technical', label: 'Technická dokumentace' },
+    { value: 'legal', label: 'Právní dokument' },
+    { value: 'creative', label: 'Kreativní materiál' },
+    { value: 'other', label: 'Ostatní' }
+  ];
 
   return (
     <UploaderContainer>
-      <GlassCard>
-        <CardHeader>
-          <HeaderSection>
-            <h3>Nahrát nový dokument</h3>
-            <CancelButton onClick={onCancel}>✕</CancelButton>
-          </HeaderSection>
-        </CardHeader>
-        
-        <CardContent>
-          <UploaderForm onSubmit={handleSubmit}>
-            {/* File Drop Zone */}
-            <DropZone
-              $isDragActive={dragActive}
-              $hasFiles={selectedFiles.length > 0}
-              onDragEnter={handleDrag}
-              onDragLeave={handleDrag}
-              onDragOver={handleDrag}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                onChange={handleFileSelect}
-                style={{ display: 'none' }}
-                accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif,.mp4,.mov,.avi"
-              />
-              
-              {selectedFiles.length === 0 ? (
-                <DropZoneContent>
-                  <DropZoneIcon>📤</DropZoneIcon>
-                  <DropZoneText>
-                    <strong>Klikněte pro výběr</strong> nebo přetáhněte soubory
-                  </DropZoneText>
-                  <DropZoneSubtext>
-                    Podporované formáty: PDF, DOC, TXT, obrázky, videa
-                  </DropZoneSubtext>
-                </DropZoneContent>
-              ) : (
-                <SelectedFiles>
-                  {selectedFiles.map((file, index) => (
-                    <SelectedFile key={index}>
-                      <FileInfo>
-                        <FileIcon>📄</FileIcon>
-                        <FileDetails>
-                          <FileName>{file.name}</FileName>
-                          <FileSize>{formatFileSize(file.size)}</FileSize>
-                        </FileDetails>
-                      </FileInfo>
-                      <RemoveButton onClick={(e) => {
+      <UploaderHeader>
+        <UploaderTitle>📤 Nahrát dokumenty</UploaderTitle>
+        <CloseButton onClick={onCancel}>✕</CloseButton>
+      </UploaderHeader>
+
+      <UploaderContent>
+        <form onSubmit={handleSubmit}>
+          {/* File Upload Area */}
+          <UploadArea
+            $dragActive={dragActive}
+            onDragEnter={handleDrag}
+            onDragLeave={handleDrag}
+            onDragOver={handleDrag}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept={acceptedTypes.join(',')}
+              onChange={handleFileSelect}
+              style={{ display: 'none' }}
+            />
+            
+            {selectedFiles.length === 0 ? (
+              <UploadPrompt>
+                <UploadIcon>📁</UploadIcon>
+                <UploadText>
+                  Přetáhněte soubory sem nebo klikněte pro výběr
+                </UploadText>
+                <UploadSubtext>
+                  Podporované formáty: {acceptedTypes.join(', ')}
+                  <br />
+                  Maximální velikost: {formatFileSize(maxFileSize)}
+                </UploadSubtext>
+              </UploadPrompt>
+            ) : (
+              <SelectedFiles>
+                {selectedFiles.map((file, index) => (
+                  <FileItem key={index}>
+                    <FileIcon>📄</FileIcon>
+                    <FileInfo>
+                      <FileName>{file.name}</FileName>
+                      <FileSize>{formatFileSize(file.size)}</FileSize>
+                    </FileInfo>
+                    <RemoveFileButton 
+                      type="button"
+                      onClick={(e) => {
                         e.stopPropagation();
                         removeFile(index);
-                      }}>
-                        ✕
-                      </RemoveButton>
-                    </SelectedFile>
-                  ))}
-                </SelectedFiles>
-              )}
-            </DropZone>
+                      }}
+                    >
+                      ✕
+                    </RemoveFileButton>
+                  </FileItem>
+                ))}
+                <AddMoreButton type="button">
+                  ➕ Přidat další soubory
+                </AddMoreButton>
+              </SelectedFiles>
+            )}
+          </UploadArea>
 
-            {/* Metadata Form */}
-            {selectedFiles.length > 0 && (
-              <MetadataSection>
-                <FormGrid>
-                  <FormGroup>
-                    <FormLabel>Název dokumentu *</FormLabel>
-                    <FormInput
-                      type="text"
-                      value={metadata.title}
-                      onChange={(e) => setMetadata(prev => ({ ...prev, title: e.target.value }))}
-                      placeholder="Zadejte název dokumentu"
-                      required
-                    />
-                  </FormGroup>
+          {/* Metadata Form */}
+          {selectedFiles.length > 0 && (
+            <MetadataForm>
+              <FormSection>
+                <SectionTitle>Informace o dokumentu</SectionTitle>
+                
+                <FormGroup>
+                  <Label>Název dokumentu *</Label>
+                  <Input
+                    type="text"
+                    value={metadata.title}
+                    onChange={(e) => setMetadata(prev => ({ ...prev, title: e.target.value }))}
+                    placeholder="Zadejte název dokumentu"
+                    required
+                  />
+                </FormGroup>
 
+                <FormGroup>
+                  <Label>Popis</Label>
+                  <Textarea
+                    value={metadata.description}
+                    onChange={(e) => setMetadata(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="Volitelný popis dokumentu"
+                    rows={3}
+                  />
+                </FormGroup>
+
+                <FormRow>
                   <FormGroup>
-                    <FormLabel>Typ dokumentu</FormLabel>
-                    <FormSelect
+                    <Label>Typ dokumentu</Label>
+                    <Select
                       value={metadata.type}
-                      onChange={(e) => setMetadata(prev => ({ ...prev, type: e.target.value }))}
+                      onChange={(e) => setMetadata(prev => ({ 
+                        ...prev, 
+                        type: e.target.value as DocumentMetadata['type']
+                      }))}
                     >
                       {documentTypes.map(type => (
                         <option key={type.value} value={type.value}>
-                          {type.icon} {type.label}
+                          {type.label}
                         </option>
                       ))}
-                    </FormSelect>
+                    </Select>
                   </FormGroup>
 
-                  <FormGroup>
-                    <FormLabel>Kategorie</FormLabel>
-                    <FormSelect
-                      value={metadata.category}
-                      onChange={(e) => setMetadata(prev => ({ ...prev, category: e.target.value }))}
-                    >
-                      {categories.map(cat => (
-                        <option key={cat.value} value={cat.value}>
-                          {cat.label}
-                        </option>
-                      ))}
-                    </FormSelect>
-                  </FormGroup>
-
-                  <FormGroup $span={2}>
-                    <FormLabel>Popis</FormLabel>
-                    <FormTextarea
-                      value={metadata.description}
-                      onChange={(e) => setMetadata(prev => ({ ...prev, description: e.target.value }))}
-                      placeholder="Volitelný popis dokumentu"
-                      rows={3}
-                    />
-                  </FormGroup>
-
-                  <FormGroup>
-                    <FormLabel>Tagy</FormLabel>
-                    <FormInput
-                      type="text"
-                      value={metadata.tags}
-                      onChange={(e) => setMetadata(prev => ({ ...prev, tags: e.target.value }))}
-                      placeholder="tag1, tag2, tag3"
-                    />
-                    <FormHint>Oddělte tagy čárkami</FormHint>
-                  </FormGroup>
-
-                  <FormGroup>
-                    <CheckboxGroup>
-                      <FormCheckbox
+                  <CheckboxGroup>
+                    <CheckboxLabel>
+                      <input
                         type="checkbox"
-                        id="approval"
-                        checked={metadata.approvalRequired}
-                        onChange={(e) => setMetadata(prev => ({ ...prev, approvalRequired: e.target.checked }))}
+                        checked={metadata.isConfidential}
+                        onChange={(e) => setMetadata(prev => ({ 
+                          ...prev, 
+                          isConfidential: e.target.checked 
+                        }))}
                       />
-                      <FormLabel htmlFor="approval">Vyžaduje schválení</FormLabel>
-                    </CheckboxGroup>
-                  </FormGroup>
-                </FormGrid>
-              </MetadataSection>
-            )}
+                      🔒 Důvěrný dokument
+                    </CheckboxLabel>
 
-            {/* Form Actions */}
-            <FormActions>
-              <OutlineButton type="button" onClick={onCancel}>
-                Zrušit
-              </OutlineButton>
-              
-              <PrimaryButton 
-                type="submit" 
-                disabled={selectedFiles.length === 0 || uploading}
-              >
-                {uploading ? '📤 Nahrávám...' : '📤 Nahrát dokument'}
-              </PrimaryButton>
-            </FormActions>
-          </UploaderForm>
-        </CardContent>
-      </GlassCard>
+                    <CheckboxLabel>
+                      <input
+                        type="checkbox"
+                        checked={metadata.approvalRequired}
+                        onChange={(e) => setMetadata(prev => ({ 
+                          ...prev, 
+                          approvalRequired: e.target.checked 
+                        }))}
+                      />
+                      ✅ Vyžaduje schválení
+                    </CheckboxLabel>
+                  </CheckboxGroup>
+                </FormRow>
+
+                <FormGroup>
+                  <Label>Tagy</Label>
+                  <TagInput>
+                    <Input
+                      type="text"
+                      value={currentTag}
+                      onChange={(e) => setCurrentTag(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
+                      placeholder="Přidat tag"
+                    />
+                    <AddTagButton type="button" onClick={addTag}>
+                      Přidat
+                    </AddTagButton>
+                  </TagInput>
+                  
+                  {metadata.tags.length > 0 && (
+                    <TagList>
+                      {metadata.tags.map(tag => (
+                        <Tag key={tag}>
+                          {tag}
+                          <TagRemove onClick={() => removeTag(tag)}>✕</TagRemove>
+                        </Tag>
+                      ))}
+                    </TagList>
+                  )}
+                </FormGroup>
+              </FormSection>
+            </MetadataForm>
+          )}
+
+          {/* Upload Progress */}
+          {uploading && (
+            <ProgressSection>
+              <ProgressLabel>Nahrávání... {uploadProgress}%</ProgressLabel>
+              <ProgressBar>
+                <ProgressFill $progress={uploadProgress} />
+              </ProgressBar>
+            </ProgressSection>
+          )}
+
+          {/* Actions */}
+          <FormActions>
+            <Button type="button" onClick={onCancel} disabled={uploading}>
+              Zrušit
+            </Button>
+            <Button 
+              type="submit" 
+              disabled={selectedFiles.length === 0 || uploading || !metadata.title.trim()}
+            >
+              {uploading ? `Nahrávání... ${uploadProgress}%` : `Nahrát ${selectedFiles.length} souborů`}
+            </Button>
+          </FormActions>
+        </form>
+      </UploaderContent>
     </UploaderContainer>
   );
 }
 
 // Styled Components
-const UploaderContainer = styled.div`
+const UploaderContainer = styled(Card)`
   max-width: 800px;
   margin: 0 auto;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  overflow: hidden;
 `;
 
-const HeaderSection = styled.div`
+const UploaderHeader = styled.div`
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  width: 100%;
+  justify-content: space-between;
+  padding: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
 `;
 
-const CancelButton = styled.button`
+const UploaderTitle = styled.h2`
+  margin: 0;
+  color: #fff;
+  font-size: 1.5rem;
+`;
+
+const CloseButton = styled.button`
+  padding: 0.5rem;
   background: none;
   border: none;
-  font-size: ${props => props.theme.typography.fontSize.xl};
-  color: ${props => props.theme.colors.textSecondary};
+  color: #8b8b8b;
+  font-size: 1.25rem;
   cursor: pointer;
-  padding: ${props => props.theme.spacing.xs};
-  border-radius: ${props => props.theme.borderRadius.sm};
-  
+  transition: color 0.2s;
+
   &:hover {
-    background: ${props => props.theme.colors.background};
-    color: ${props => props.theme.colors.text};
+    color: #fff;
   }
 `;
 
-const UploaderForm = styled.form`
-  display: flex;
-  flex-direction: column;
-  gap: ${props => props.theme.spacing.xl};
+const UploaderContent = styled.div`
+  padding: 2rem;
 `;
 
-const DropZone = styled.div<{ $isDragActive: boolean; $hasFiles: boolean }>`
-  border: 2px dashed ${props => {
-    if (props.$isDragActive) return props.theme.colors.primary;
-    if (props.$hasFiles) return props.theme.colors.success;
-    return props.theme.colors.border;
-  }};
-  border-radius: ${props => props.theme.borderRadius.lg};
-  padding: ${props => props.theme.spacing['2xl']};
+const UploadArea = styled.div<{ $dragActive: boolean }>`
+  border: 2px dashed ${props => props.$dragActive 
+    ? '#667eea' 
+    : 'rgba(255, 255, 255, 0.2)'
+  };
+  border-radius: 12px;
+  padding: 2rem;
   text-align: center;
   cursor: pointer;
-  transition: all ${props => props.theme.transitions.normal};
-  background: ${props => {
-    if (props.$isDragActive) return `${props.theme.colors.primary}10`;
-    if (props.$hasFiles) return `${props.theme.colors.success}10`;
-    return props.theme.colors.background;
-  }};
+  transition: all 0.2s;
+  background: ${props => props.$dragActive 
+    ? 'rgba(103, 126, 234, 0.1)' 
+    : 'rgba(255, 255, 255, 0.05)'
+  };
+  margin-bottom: 2rem;
 
   &:hover {
-    border-color: ${props => props.theme.colors.primary};
-    background: ${props => props.theme.colors.primary}10;
+    border-color: #667eea;
+    background: rgba(103, 126, 234, 0.1);
   }
 `;
 
-const DropZoneContent = styled.div``;
+const UploadPrompt = styled.div``;
 
-const DropZoneIcon = styled.div`
-  font-size: ${props => props.theme.typography.fontSize['3xl']};
-  margin-bottom: ${props => props.theme.spacing.md};
+const UploadIcon = styled.div`
+  font-size: 3rem;
+  margin-bottom: 1rem;
 `;
 
-const DropZoneText = styled.p`
-  margin: 0 0 ${props => props.theme.spacing.sm} 0;
-  color: ${props => props.theme.colors.text};
-  font-size: ${props => props.theme.typography.fontSize.lg};
+const UploadText = styled.div`
+  color: #fff;
+  font-size: 1.1rem;
+  margin-bottom: 0.5rem;
 `;
 
-const DropZoneSubtext = styled.p`
-  margin: 0;
-  color: ${props => props.theme.colors.textSecondary};
-  font-size: ${props => props.theme.typography.fontSize.sm};
+const UploadSubtext = styled.div`
+  color: #8b8b8b;
+  font-size: 0.875rem;
+  line-height: 1.5;
 `;
 
 const SelectedFiles = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${props => props.theme.spacing.md};
+  gap: 0.75rem;
 `;
 
-const SelectedFile = styled.div`
+const FileItem = styled.div`
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: ${props => props.theme.spacing.md};
-  background: ${props => props.theme.colors.surface};
-  border-radius: ${props => props.theme.borderRadius.md};
-`;
-
-const FileInfo = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${props => props.theme.spacing.md};
+  gap: 1rem;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
 `;
 
 const FileIcon = styled.div`
-  font-size: ${props => props.theme.typography.fontSize.xl};
+  font-size: 1.5rem;
 `;
 
-const FileDetails = styled.div``;
+const FileInfo = styled.div`
+  flex: 1;
+  text-align: left;
+`;
 
 const FileName = styled.div`
-  font-weight: ${props => props.theme.typography.fontWeight.medium};
-  color: ${props => props.theme.colors.text};
+  color: #fff;
+  font-weight: 500;
+  margin-bottom: 0.25rem;
 `;
 
 const FileSize = styled.div`
-  font-size: ${props => props.theme.typography.fontSize.sm};
-  color: ${props => props.theme.colors.textSecondary};
+  color: #8b8b8b;
+  font-size: 0.75rem;
 `;
 
-const RemoveButton = styled.button`
-  background: none;
-  border: none;
-  color: ${props => props.theme.colors.textSecondary};
+const RemoveFileButton = styled.button`
+  padding: 0.25rem 0.5rem;
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 4px;
+  color: #ef4444;
   cursor: pointer;
-  padding: ${props => props.theme.spacing.xs};
-  border-radius: ${props => props.theme.borderRadius.sm};
-  
+  transition: all 0.2s;
+
   &:hover {
-    background: ${props => props.theme.colors.background};
-    color: ${props => props.theme.colors.text};
+    background: rgba(239, 68, 68, 0.3);
   }
 `;
 
-const MetadataSection = styled.div`
-  border-top: 1px solid ${props => props.theme.colors.border};
-  padding-top: ${props => props.theme.spacing.xl};
+const AddMoreButton = styled.button`
+  padding: 0.75rem;
+  background: rgba(103, 126, 234, 0.1);
+  border: 1px dashed rgba(103, 126, 234, 0.4);
+  border-radius: 8px;
+  color: #667eea;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: rgba(103, 126, 234, 0.2);
+  }
 `;
 
-const FormGrid = styled.div`
+const MetadataForm = styled.div`
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+`;
+
+const FormSection = styled.div``;
+
+const SectionTitle = styled.h3`
+  margin: 0 0 1.5rem 0;
+  color: #fff;
+  font-size: 1.1rem;
+`;
+
+const FormGroup = styled.div`
+  margin-bottom: 1.5rem;
+`;
+
+const FormRow = styled.div`
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: ${props => props.theme.spacing.lg};
-  
+  gap: 1.5rem;
+  margin-bottom: 1.5rem;
+
   @media (max-width: 768px) {
     grid-template-columns: 1fr;
   }
 `;
 
-const FormGroup = styled.div<{ $span?: number }>`
-  display: flex;
-  flex-direction: column;
-  gap: ${props => props.theme.spacing.sm};
-  grid-column: ${props => props.$span ? `span ${props.$span}` : 'span 1'};
+const Label = styled.label`
+  display: block;
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
 `;
 
-const FormLabel = styled.label`
-  font-weight: ${props => props.theme.typography.fontWeight.medium};
-  color: ${props => props.theme.colors.text};
-  font-size: ${props => props.theme.typography.fontSize.sm};
-`;
-
-const FormInput = styled.input`
-  padding: ${props => props.theme.spacing.md};
-  border: 1px solid ${props => props.theme.colors.border};
-  border-radius: ${props => props.theme.borderRadius.md};
-  background: ${props => props.theme.colors.background};
-  color: ${props => props.theme.colors.text};
-  
-  &:focus {
-    outline: none;
-    border-color: ${props => props.theme.colors.primary};
-  }
-`;
-
-const FormSelect = styled.select`
-  padding: ${props => props.theme.spacing.md};
-  border: 1px solid ${props => props.theme.colors.border};
-  border-radius: ${props => props.theme.borderRadius.md};
-  background: ${props => props.theme.colors.background};
-  color: ${props => props.theme.colors.text};
-  
-  &:focus {
-    outline: none;
-    border-color: ${props => props.theme.colors.primary};
-  }
-`;
-
-const FormTextarea = styled.textarea`
-  padding: ${props => props.theme.spacing.md};
-  border: 1px solid ${props => props.theme.colors.border};
-  border-radius: ${props => props.theme.borderRadius.md};
-  background: ${props => props.theme.colors.background};
-  color: ${props => props.theme.colors.text};
+const Input = styled.input`
+  width: 100%;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #fff;
   font-family: inherit;
-  resize: vertical;
-  
+  font-size: 0.875rem;
+
+  &::placeholder {
+    color: #8b8b8b;
+  }
+
   &:focus {
     outline: none;
-    border-color: ${props => props.theme.colors.primary};
+    border-color: rgba(103, 126, 234, 0.4);
   }
 `;
 
-const FormHint = styled.div`
-  font-size: ${props => props.theme.typography.fontSize.xs};
-  color: ${props => props.theme.colors.textSecondary};
+const Textarea = styled.textarea`
+  width: 100%;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.875rem;
+  resize: vertical;
+
+  &::placeholder {
+    color: #8b8b8b;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: rgba(103, 126, 234, 0.4);
+  }
+`;
+
+const Select = styled.select`
+  width: 100%;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+
+  &:focus {
+    outline: none;
+    border-color: rgba(103, 126, 234, 0.4);
+  }
+
+  option {
+    background: #1a1a2e;
+    color: #fff;
+  }
 `;
 
 const CheckboxGroup = styled.div`
   display: flex;
-  align-items: center;
-  gap: ${props => props.theme.spacing.sm};
+  flex-direction: column;
+  gap: 0.75rem;
 `;
 
-const FormCheckbox = styled.input`
-  width: 16px;
-  height: 16px;
-  accent-color: ${props => props.theme.colors.primary};
+const CheckboxLabel = styled.label`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #8b8b8b;
+  font-size: 0.875rem;
+  cursor: pointer;
+
+  input[type="checkbox"] {
+    accent-color: #667eea;
+  }
+`;
+
+const TagInput = styled.div`
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+`;
+
+const AddTagButton = styled.button`
+  padding: 0.75rem 1rem;
+  background: rgba(103, 126, 234, 0.2);
+  border: 1px solid rgba(103, 126, 234, 0.4);
+  border-radius: 6px;
+  color: #667eea;
+  font-family: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+
+  &:hover {
+    background: rgba(103, 126, 234, 0.3);
+  }
+`;
+
+const TagList = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+`;
+
+const Tag = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background: rgba(103, 126, 234, 0.2);
+  border: 1px solid rgba(103, 126, 234, 0.4);
+  border-radius: 4px;
+  color: #667eea;
+  font-size: 0.75rem;
+`;
+
+const TagRemove = styled.button`
+  background: none;
+  border: none;
+  color: #667eea;
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.75rem;
+
+  &:hover {
+    color: #ef4444;
+  }
+`;
+
+const ProgressSection = styled.div`
+  margin-bottom: 2rem;
+`;
+
+const ProgressLabel = styled.div`
+  color: #fff;
+  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+`;
+
+const ProgressBar = styled.div`
+  height: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+`;
+
+const ProgressFill = styled.div<{ $progress: number }>`
+  height: 100%;
+  width: ${props => props.$progress}%;
+  background: linear-gradient(90deg, #667eea, #764ba2);
+  transition: width 0.3s ease;
 `;
 
 const FormActions = styled.div`
   display: flex;
-  gap: ${props => props.theme.spacing.md};
+  gap: 1rem;
   justify-content: flex-end;
-  border-top: 1px solid ${props => props.theme.colors.border};
-  padding-top: ${props => props.theme.spacing.xl};
-  
-  @media (max-width: 768px) {
-    flex-direction: column;
-  }
 `;
+
+export default DocumentUploader;

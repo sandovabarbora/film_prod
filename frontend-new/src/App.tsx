@@ -1,77 +1,110 @@
-// src/App.tsx
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import React, { Suspense } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from 'styled-components';
-
-// Contexts
 import { AuthProvider } from './contexts/AuthContext';
-import { NotificationProvider } from './components/common/Notification';
-
-// Components
+import { ProjectProvider } from './contexts/ProjectContext';
+import { Theme } from './styles/theme';
+import { GlobalStyles } from './styles/GlobalStyles';
 import ErrorBoundary from './components/common/ErrorBoundary';
-import { ProtectedRoute } from './components/layout/ProtectedRoute';
-import { AppLayout } from './components/layout/AppLayout';
-import { Header } from './components/Header';
+import Loading from './components/common/Loading';
+import AppLayout from './components/layout/AppLayout';
+import ProtectedRoute from './components/layout/ProtectedRoute';
 
 // Pages
-import Login from './pages/Auth/Login';
 import Dashboard from './pages/Dashboard';
 import Films from './pages/Films';
-import Communication from './pages/Communication';
-import Schedule from './pages/Schedule';
+import ProjectDetail from './pages/ProjectDetail';
 import Crew from './pages/Crew';
+import Schedule from './pages/Schedule';
 import Budget from './pages/Budget';
+import Documents from './pages/Documents';
+import Communication from './pages/Communication';
 import Equipment from './pages/Equipment';
 import Locations from './pages/Locations';
-import Documents from './pages/Documents';
 import Weather from './pages/Weather';
-import ProjectDetail from './pages/ProjectDetail';
 
+// Auth pages
+import Login from './pages/Auth/Login';
+import Onboarding from './pages/Auth/Onboarding';
+import JoinProduction from './pages/Auth/JoinProduction';
 
-// Styles
-import { GlobalStyles } from './styles/GlobalStyles';
-import { Theme } from './styles/theme';
-
-function App(): JSX.Element {
+const App: React.FC = () => {
   return (
     <ErrorBoundary>
       <ThemeProvider theme={Theme}>
         <GlobalStyles />
-        <NotificationProvider>
-          <AuthProvider>
-            <Router>
+        <AuthProvider>
+          <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+            <Suspense fallback={<Loading />}>
               <Routes>
-                {/* Public routes */}
+                {/* Auth routes */}
                 <Route path="/login" element={<Login />} />
+                <Route path="/onboarding" element={<Onboarding />} />
+                <Route path="/join" element={<JoinProduction />} />
                 
-                {/* Protected routes with layout */}
-                <Route path="/*" element={
-                  <ProtectedRoute>
-                    <AppLayout>
-                      <Routes>
-                        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                        <Route path="/dashboard" element={<Dashboard />} />
-                        <Route path="/films" element={<Films />} />
-                        <Route path="/communication" element={<Communication />} />
-                        <Route path="/schedule" element={<Schedule />} />
-                        <Route path="/crew" element={<Crew />} />
-                        <Route path="/budget" element={<Budget />} />
-                        <Route path="/equipment" element={<Equipment />} />
-                        <Route path="/locations" element={<Locations />} />
-                        <Route path="/documents" element={<Documents />} />
-                        <Route path="/films/:id" element={<ProjectDetail />} />
-                        <Route path="/weather" element={<Weather />} />
-                      </Routes>
-                    </AppLayout>
-                  </ProtectedRoute>
-                } />
+                {/* Protected app routes */}
+                <Route 
+                  path="/*" 
+                  element={
+                    <ProtectedRoute>
+                      <AppLayout>
+                        <Routes>
+                          {/* Dashboard */}
+                          <Route path="" element={<Dashboard />} />
+                          <Route path="dashboard" element={<Dashboard />} />
+                          
+                          {/* Films */}
+                          <Route path="films" element={<Films />} />
+                          <Route path="films/:id" element={<ProjectDetail />} />
+                          
+                          {/* Project-specific routes with ProjectProvider */}
+                          <Route path="films/:id/schedule" element={
+                            <ProjectProvider>
+                              <Schedule />
+                            </ProjectProvider>
+                          } />
+                          <Route path="films/:id/crew" element={
+                            <ProjectProvider>
+                              <Crew />
+                            </ProjectProvider>
+                          } />
+                          <Route path="films/:id/budget" element={
+                            <ProjectProvider>
+                              <Budget />
+                            </ProjectProvider>
+                          } />
+                          <Route path="films/:id/documents" element={
+                            <ProjectProvider>
+                              <Documents />
+                            </ProjectProvider>
+                          } />
+                          <Route path="films/:id/locations" element={
+                            <ProjectProvider>
+                              <Locations />
+                            </ProjectProvider>
+                          } />
+                          
+                          {/* Global routes - bez ProjectProvider */}
+                          <Route path="crew" element={<Crew />} />
+                          <Route path="schedule" element={<Schedule />} />
+                          <Route path="budget" element={<Budget />} />
+                          <Route path="documents" element={<Documents />} />
+                          <Route path="communication" element={<Communication />} />
+                          <Route path="equipment" element={<Equipment />} />
+                          <Route path="locations" element={<Locations />} />
+                          <Route path="weather" element={<Weather />} />
+                        </Routes>
+                      </AppLayout>
+                    </ProtectedRoute>
+                  } 
+                />
               </Routes>
-            </Router>
-          </AuthProvider>
-        </NotificationProvider>
+            </Suspense>
+          </Router>
+        </AuthProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );
-}
+};
 
 export default App;

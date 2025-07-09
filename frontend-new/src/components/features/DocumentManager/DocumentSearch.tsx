@@ -1,703 +1,769 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { PrimaryButton, SecondaryButton, OutlineButton } from '../../ui/Button';
-import { Card, GlassCard, CardContent } from '../../ui/Card';
+import { Card } from '../../ui/Card';
+import { Button } from '../../ui/Button';
 
-type ViewMode = 'grid' | 'list' | 'viewer' | 'upload' | 'versions';
-
-interface DocumentSearchProps {
-  searchQuery: string;
-  onSearchChange: (query: string) => void;
-  filterType: string;
-  onFilterTypeChange: (type: string) => void;
-  filterCategory: string;
-  onFilterCategoryChange: (category: string) => void;
-  filterStatus: string;
-  onFilterStatusChange: (status: string) => void;
-  sortBy: string;
-  onSortByChange: (sortBy: string) => void;
-  sortOrder: 'asc' | 'desc';
-  onSortOrderChange: (order: 'asc' | 'desc') => void;
-  viewMode: ViewMode;
-  onViewModeChange: (mode: ViewMode) => void;
-  analytics: {
-    totalDocs: number;
-    totalSize: number;
-    byStatus: Record<string, number>;
-    byType: Record<string, number>;
-    pendingApprovals: number;
-    recentlyModified: number;
-  };
-  onUploadClick: () => void;
-  currentUser: {
-    name: string;
-    role: string;
-    permissions: string[];
-  };
+interface SearchFilters {
+  query: string;
+  type: string;
+  status: string;
+  dateFrom: string;
+  dateTo: string;
+  tags: string[];
+  uploadedBy: string;
+  sortBy: 'name' | 'date' | 'size' | 'type';
+  sortDirection: 'asc' | 'desc';
 }
 
-export function DocumentSearch({ 
-  searchQuery,
-  onSearchChange,
-  filterType,
-  onFilterTypeChange,
-  filterCategory,
-  onFilterCategoryChange,
-  filterStatus,
-  onFilterStatusChange,
-  sortBy,
-  onSortByChange,
-  sortOrder,
-  onSortOrderChange,
-  viewMode,
-  onViewModeChange,
-  analytics,
-  onUploadClick,
-  currentUser
+interface DocumentSearchProps {
+  onSearch: (filters: SearchFilters) => void;
+  onReset: () => void;
+  initialFilters?: Partial<SearchFilters>;
+  availableTypes?: string[];
+  availableStatuses?: string[];
+  availableTags?: string[];
+  availableUsers?: string[];
+  isLoading?: boolean;
+  resultCount?: number;
+}
+
+const defaultFilters: SearchFilters = {
+  query: '',
+  type: 'all',
+  status: 'all',
+  dateFrom: '',
+  dateTo: '',
+  tags: [],
+  uploadedBy: 'all',
+  sortBy: 'date',
+  sortDirection: 'desc'
+};
+
+export function DocumentSearch({
+  onSearch,
+  onReset,
+  initialFilters = {},
+  availableTypes = ['script', 'schedule', 'budget', 'contract', 'technical', 'legal', 'creative', 'other'],
+  availableStatuses = ['draft', 'review', 'approved', 'final', 'archived'],
+  availableTags = [],
+  availableUsers = [],
+  isLoading = false,
+  resultCount
 }: DocumentSearchProps) {
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [filters, setFilters] = useState<SearchFilters>({
+    ...defaultFilters,
+    ...initialFilters
+  });
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [currentTag, setCurrentTag] = useState('');
 
-  const documentTypes = [
-    { value: 'all', label: 'Všechny typy', icon: '📁' },
-    { value: 'script', label: 'Scénáře', icon: '📝' },
-    { value: 'contract', label: 'Smlouvy', icon: '📄' },
-    { value: 'callsheet', label: 'Call Sheets', icon: '📋' },
-    { value: 'storyboard', label: 'Storyboardy', icon: '🎨' },
-    { value: 'concept', label: 'Koncepty', icon: '💡' },
-    { value: 'legal', label: 'Právní dokumenty', icon: '⚖️' },
-    { value: 'schedule', label: 'Harmonogramy', icon: '📅' },
-    { value: 'other', label: 'Ostatní', icon: '📎' }
-  ];
+  useEffect(() => {
+    // Trigger search when filters change (with debounce for query)
+    const timeoutId = setTimeout(() => {
+      onSearch(filters);
+    }, filters.query ? 300 : 0);
 
-  const categories = [
-    { value: 'all', label: 'Všechny fáze', icon: '🎬' },
-    { value: 'pre_production', label: 'Příprava', icon: '📝' },
-    { value: 'production', label: 'Natáčení', icon: '🎥' },
-    { value: 'post_production', label: 'Postprodukce', icon: '✂️' },
-    { value: 'admin', label: 'Administrativa', icon: '📊' },
-    { value: 'legal', label: 'Právní', icon: '⚖️' }
-  ];
+    return () => clearTimeout(timeoutId);
+  }, [filters, onSearch]);
 
-  const statuses = [
-    { value: 'all', label: 'Všechny stavy', icon: '🔍' },
-    { value: 'draft', label: 'Koncept', icon: '✏️' },
-    { value: 'review', label: 'Na review', icon: '👁️' },
-    { value: 'approved', label: 'Schváleno', icon: '✅' },
-    { value: 'final', label: 'Finální', icon: '🔒' },
-    { value: 'archived', label: 'Archivováno', icon: '📦' }
-  ];
-
-  const sortOptions = [
-    { value: 'lastModified', label: 'Datum úpravy' },
-    { value: 'uploadedAt', label: 'Datum nahrání' },
-    { value: 'title', label: 'Název' },
-    { value: 'size', label: 'Velikost' },
-    { value: 'type', label: 'Typ' },
-    { value: 'status', label: 'Status' }
-  ];
-
-  const viewModes = [
-    { id: 'grid' as ViewMode, label: 'Mřížka', icon: '⊞' },
-    { id: 'list' as ViewMode, label: 'Seznam', icon: '☰' }
-  ];
-
-  const formatFileSize = (bytes: number) => {
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    if (bytes === 0) return '0 B';
-    const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+  const updateFilter = <K extends keyof SearchFilters>(
+    key: K,
+    value: SearchFilters[K]
+  ) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
   };
 
-  const getQuickFilters = () => {
-    const filters = [];
-    
-    if (analytics.pendingApprovals > 0) {
-      filters.push({
-        label: `${analytics.pendingApprovals} čeká na schválení`,
-        action: () => onFilterStatusChange('review'),
-        color: '#F59E0B'
-      });
-    }
-
-    if (analytics.recentlyModified > 0) {
-      filters.push({
-        label: `${analytics.recentlyModified} upraveno tento týden`,
-        action: () => {}, // Custom filter logic would go here
-        color: '#10B981'
-      });
-    }
-
-    if (analytics.byStatus.draft > 0) {
-      filters.push({
-        label: `${analytics.byStatus.draft} konceptů`,
-        action: () => onFilterStatusChange('draft'),
-        color: '#6B7280'
-      });
-    }
-
-    return filters;
+  const handleReset = () => {
+    setFilters(defaultFilters);
+    setShowAdvanced(false);
+    onReset();
   };
 
-  const getCurrentAlert = () => {
-    if (analytics.pendingApprovals > 0) {
-      return {
-        level: 'warning',
-        message: `${analytics.pendingApprovals} dokumentů čeká na schválení`,
-        color: '#F59E0B'
-      };
+  const addTag = () => {
+    if (currentTag.trim() && !filters.tags.includes(currentTag.trim())) {
+      updateFilter('tags', [...filters.tags, currentTag.trim()]);
+      setCurrentTag('');
     }
-    
-    if (analytics.byStatus.review > 5) {
-      return {
-        level: 'info',
-        message: `${analytics.byStatus.review} dokumentů na review`,
-        color: '#3B82F6'
-      };
-    }
+  };
 
-    return {
-      level: 'success',
-      message: 'Dokumenty jsou v pořádku',
-      color: '#10B981'
+  const removeTag = (tagToRemove: string) => {
+    updateFilter('tags', filters.tags.filter(tag => tag !== tagToRemove));
+  };
+
+  const getTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      'script': 'Scénář',
+      'schedule': 'Harmonogram',
+      'budget': 'Rozpočet',
+      'contract': 'Smlouva',
+      'technical': 'Technická dokumentace',
+      'legal': 'Právní dokument',
+      'creative': 'Kreativní materiál',
+      'other': 'Ostatní'
     };
+    return labels[type] || type;
   };
 
-  const currentAlert = getCurrentAlert();
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      'draft': 'Koncept',
+      'review': 'Na kontrole',
+      'approved': 'Schváleno',
+      'final': 'Finální',
+      'archived': 'Archivováno'
+    };
+    return labels[status] || status;
+  };
+
+  const getSortLabel = (sort: string) => {
+    const labels: Record<string, string> = {
+      'name': 'Názvu',
+      'date': 'Datu',
+      'size': 'Velikosti',
+      'type': 'Typu'
+    };
+    return labels[sort] || sort;
+  };
+
+  const hasActiveFilters = () => {
+    return filters.query !== '' ||
+           filters.type !== 'all' ||
+           filters.status !== 'all' ||
+           filters.dateFrom !== '' ||
+           filters.dateTo !== '' ||
+           filters.tags.length > 0 ||
+           filters.uploadedBy !== 'all' ||
+           filters.sortBy !== 'date' ||
+           filters.sortDirection !== 'desc';
+  };
 
   return (
     <SearchContainer>
-      {/* Main Search Bar */}
       <SearchHeader>
-        <SearchBarSection>
-          <SearchInputContainer>
-            <SearchIcon>🔍</SearchIcon>
-            <SearchInput
-              type="text"
-              placeholder="Hledat dokumenty, názvy, tagy..."
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-            />
-            {searchQuery && (
-              <ClearButton onClick={() => onSearchChange('')}>
-                ✕
-              </ClearButton>
-            )}
-          </SearchInputContainer>
-
-          <QuickActions>
-            <ViewModeSelector>
-              {viewModes.map(mode => (
-                <ViewModeButton
-                  key={mode.id}
-                  $isActive={viewMode === mode.id}
-                  onClick={() => onViewModeChange(mode.id)}
-                  title={mode.label}
-                >
-                  {mode.icon}
-                </ViewModeButton>
-              ))}
-            </ViewModeSelector>
-
-            <PrimaryButton onClick={onUploadClick} size="sm">
-              📤 Nahrát dokument
-            </PrimaryButton>
-          </QuickActions>
-        </SearchBarSection>
-
-        {/* Status Alert */}
-        <StatusAlert $level={currentAlert.level}>
-          <AlertIcon>
-            {currentAlert.level === 'warning' && '⚠️'}
-            {currentAlert.level === 'info' && 'ℹ️'}
-            {currentAlert.level === 'success' && '✅'}
-          </AlertIcon>
-          <AlertMessage>{currentAlert.message}</AlertMessage>
-        </StatusAlert>
+        <SearchTitle>🔍 Vyhledávání dokumentů</SearchTitle>
+        {resultCount !== undefined && (
+          <ResultCount>
+            {resultCount} {resultCount === 1 ? 'výsledek' : resultCount < 5 ? 'výsledky' : 'výsledků'}
+          </ResultCount>
+        )}
       </SearchHeader>
 
-      {/* Quick Filters */}
-      <QuickFiltersSection>
-        <QuickFiltersList>
-          {getQuickFilters().map((filter, index) => (
-            <QuickFilterButton
-              key={index}
-              onClick={filter.action}
-              $color={filter.color}
-            >
-              {filter.label}
-            </QuickFilterButton>
-          ))}
-        </QuickFiltersList>
+      <SearchContent>
+        {/* Basic Search */}
+        <BasicSearch>
+          <SearchInputGroup>
+            <SearchInput
+              type="text"
+              placeholder="Hledat podle názvu, obsahu nebo tagů..."
+              value={filters.query}
+              onChange={(e) => updateFilter('query', e.target.value)}
+            />
+            <SearchButton disabled={isLoading}>
+              {isLoading ? '🔄' : '🔍'}
+            </SearchButton>
+          </SearchInputGroup>
 
-        <FilterToggle onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}>
-          🔧 {showAdvancedFilters ? 'Skrýt' : 'Zobrazit'} filtry
-        </FilterToggle>
-      </QuickFiltersSection>
+          <QuickFilters>
+            <FilterGroup>
+              <FilterLabel>Typ:</FilterLabel>
+              <QuickSelect
+                value={filters.type}
+                onChange={(e) => updateFilter('type', e.target.value)}
+              >
+                <option value="all">Všechny typy</option>
+                {availableTypes.map(type => (
+                  <option key={type} value={type}>
+                    {getTypeLabel(type)}
+                  </option>
+                ))}
+              </QuickSelect>
+            </FilterGroup>
 
-      {/* Advanced Filters */}
-      {showAdvancedFilters && (
-        <AdvancedFilters>
-          <GlassCard>
-            <CardContent>
-              <FiltersGrid>
-                {/* Type Filter */}
+            <FilterGroup>
+              <FilterLabel>Stav:</FilterLabel>
+              <QuickSelect
+                value={filters.status}
+                onChange={(e) => updateFilter('status', e.target.value)}
+              >
+                <option value="all">Všechny stavy</option>
+                {availableStatuses.map(status => (
+                  <option key={status} value={status}>
+                    {getStatusLabel(status)}
+                  </option>
+                ))}
+              </QuickSelect>
+            </FilterGroup>
+
+            <FilterGroup>
+              <FilterLabel>Řadit podle:</FilterLabel>
+              <SortContainer>
+                <QuickSelect
+                  value={filters.sortBy}
+                  onChange={(e) => updateFilter('sortBy', e.target.value as SearchFilters['sortBy'])}
+                >
+                  <option value="date">Data</option>
+                  <option value="name">Názvu</option>
+                  <option value="size">Velikosti</option>
+                  <option value="type">Typu</option>
+                </QuickSelect>
+                <SortDirectionButton
+                  onClick={() => updateFilter('sortDirection', filters.sortDirection === 'asc' ? 'desc' : 'asc')}
+                >
+                  {filters.sortDirection === 'asc' ? '↑' : '↓'}
+                </SortDirectionButton>
+              </SortContainer>
+            </FilterGroup>
+          </QuickFilters>
+
+          <SearchActions>
+            <AdvancedToggle onClick={() => setShowAdvanced(!showAdvanced)}>
+              {showAdvanced ? '🔽' : '🔼'} Pokročilé vyhledávání
+            </AdvancedToggle>
+            
+            {hasActiveFilters() && (
+              <ResetButton onClick={handleReset}>
+                🗑️ Vymazat filtry
+              </ResetButton>
+            )}
+          </SearchActions>
+        </BasicSearch>
+
+        {/* Advanced Search */}
+        {showAdvanced && (
+          <AdvancedSearch>
+            <AdvancedTitle>Pokročilé filtry</AdvancedTitle>
+            
+            <AdvancedFilters>
+              <FilterRow>
                 <FilterGroup>
-                  <FilterLabel>Typ dokumentu:</FilterLabel>
-                  <FilterSelect 
-                    value={filterType} 
-                    onChange={(e) => onFilterTypeChange(e.target.value)}
-                  >
-                    {documentTypes.map(type => (
-                      <option key={type.value} value={type.value}>
-                        {type.icon} {type.label}
-                      </option>
-                    ))}
-                  </FilterSelect>
+                  <FilterLabel>Datum od:</FilterLabel>
+                  <DateInput
+                    type="date"
+                    value={filters.dateFrom}
+                    onChange={(e) => updateFilter('dateFrom', e.target.value)}
+                  />
                 </FilterGroup>
 
-                {/* Category Filter */}
                 <FilterGroup>
-                  <FilterLabel>Fáze projektu:</FilterLabel>
-                  <FilterSelect 
-                    value={filterCategory} 
-                    onChange={(e) => onFilterCategoryChange(e.target.value)}
-                  >
-                    {categories.map(category => (
-                      <option key={category.value} value={category.value}>
-                        {category.icon} {category.label}
-                      </option>
-                    ))}
-                  </FilterSelect>
+                  <FilterLabel>Datum do:</FilterLabel>
+                  <DateInput
+                    type="date"
+                    value={filters.dateTo}
+                    onChange={(e) => updateFilter('dateTo', e.target.value)}
+                  />
                 </FilterGroup>
 
-                {/* Status Filter */}
-                <FilterGroup>
-                  <FilterLabel>Status:</FilterLabel>
-                  <FilterSelect 
-                    value={filterStatus} 
-                    onChange={(e) => onFilterStatusChange(e.target.value)}
-                  >
-                    {statuses.map(status => (
-                      <option key={status.value} value={status.value}>
-                        {status.icon} {status.label}
-                      </option>
-                    ))}
-                  </FilterSelect>
-                </FilterGroup>
-
-                {/* Sort Controls */}
-                <FilterGroup>
-                  <FilterLabel>Řadit podle:</FilterLabel>
-                  <SortControls>
-                    <FilterSelect 
-                      value={sortBy} 
-                      onChange={(e) => onSortByChange(e.target.value)}
+                {availableUsers.length > 0 && (
+                  <FilterGroup>
+                    <FilterLabel>Nahráno uživatelem:</FilterLabel>
+                    <QuickSelect
+                      value={filters.uploadedBy}
+                      onChange={(e) => updateFilter('uploadedBy', e.target.value)}
                     >
-                      {sortOptions.map(option => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
+                      <option value="all">Všichni uživatelé</option>
+                      {availableUsers.map(user => (
+                        <option key={user} value={user}>
+                          {user}
                         </option>
                       ))}
-                    </FilterSelect>
-                    <SortOrderButton 
-                      onClick={() => onSortOrderChange(sortOrder === 'asc' ? 'desc' : 'asc')}
-                      title={sortOrder === 'asc' ? 'Vzestupně' : 'Sestupně'}
-                    >
-                      {sortOrder === 'asc' ? '↑' : '↓'}
-                    </SortOrderButton>
-                  </SortControls>
-                </FilterGroup>
-              </FiltersGrid>
+                    </QuickSelect>
+                  </FilterGroup>
+                )}
+              </FilterRow>
 
-              {/* Filter Actions */}
-              <FilterActions>
-                <SecondaryButton 
-                  size="sm"
-                  onClick={() => {
-                    onFilterTypeChange('all');
-                    onFilterCategoryChange('all');
-                    onFilterStatusChange('all');
-                    onSearchChange('');
-                  }}
-                >
-                  🔄 Vyčistit filtry
-                </SecondaryButton>
-              </FilterActions>
-            </CardContent>
-          </GlassCard>
-        </AdvancedFilters>
-      )}
+              <FilterGroup>
+                <FilterLabel>Tagy:</FilterLabel>
+                <TagInput>
+                  <TagInputField
+                    type="text"
+                    placeholder="Přidat tag..."
+                    value={currentTag}
+                    onChange={(e) => setCurrentTag(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
+                  />
+                  <AddTagButton onClick={addTag} disabled={!currentTag.trim()}>
+                    Přidat
+                  </AddTagButton>
+                </TagInput>
 
-      {/* Document Stats */}
-      <DocumentStats>
-        <StatsCard>
-          <StatItem>
-            <StatIcon>📁</StatIcon>
-            <StatValue>{analytics.totalDocs}</StatValue>
-            <StatLabel>Dokumentů</StatLabel>
-          </StatItem>
+                {filters.tags.length > 0 && (
+                  <TagList>
+                    {filters.tags.map(tag => (
+                      <Tag key={tag}>
+                        {tag}
+                        <TagRemove onClick={() => removeTag(tag)}>✕</TagRemove>
+                      </Tag>
+                    ))}
+                  </TagList>
+                )}
 
-          <StatItem>
-            <StatIcon>💾</StatIcon>
-            <StatValue>{formatFileSize(analytics.totalSize)}</StatValue>
-            <StatLabel>Celková velikost</StatLabel>
-          </StatItem>
+                {availableTags.length > 0 && (
+                  <SuggestedTags>
+                    <SuggestedTagsLabel>Dostupné tagy:</SuggestedTagsLabel>
+                    <SuggestedTagsList>
+                      {availableTags
+                        .filter(tag => !filters.tags.includes(tag))
+                        .slice(0, 10)
+                        .map(tag => (
+                          <SuggestedTag
+                            key={tag}
+                            onClick={() => updateFilter('tags', [...filters.tags, tag])}
+                          >
+                            {tag}
+                          </SuggestedTag>
+                        ))}
+                    </SuggestedTagsList>
+                  </SuggestedTags>
+                )}
+              </FilterGroup>
+            </AdvancedFilters>
+          </AdvancedSearch>
+        )}
 
-          <StatItem $status={analytics.pendingApprovals > 0 ? 'warning' : 'neutral'}>
-            <StatIcon>⏳</StatIcon>
-            <StatValue>{analytics.pendingApprovals}</StatValue>
-            <StatLabel>Čeká na schválení</StatLabel>
-          </StatItem>
-
-          <StatItem>
-            <StatIcon>✅</StatIcon>
-            <StatValue>{analytics.byStatus.approved + analytics.byStatus.final}</StatValue>
-            <StatLabel>Schváleno</StatLabel>
-          </StatItem>
-
-          <StatItem>
-            <StatIcon>📝</StatIcon>
-            <StatValue>{analytics.byType.script}</StatValue>
-            <StatLabel>Scénářů</StatLabel>
-          </StatItem>
-
-          <StatItem>
-            <StatIcon>📄</StatIcon>
-            <StatValue>{analytics.byType.contract}</StatValue>
-            <StatLabel>Smluv</StatLabel>
-          </StatItem>
-        </StatsCard>
-      </DocumentStats>
+        {/* Active Filters Summary */}
+        {hasActiveFilters() && (
+          <ActiveFilters>
+            <ActiveFiltersTitle>Aktivní filtry:</ActiveFiltersTitle>
+            <ActiveFiltersList>
+              {filters.query && (
+                <ActiveFilter>
+                  Hledaný text: "{filters.query}"
+                  <FilterRemove onClick={() => updateFilter('query', '')}>✕</FilterRemove>
+                </ActiveFilter>
+              )}
+              {filters.type !== 'all' && (
+                <ActiveFilter>
+                  Typ: {getTypeLabel(filters.type)}
+                  <FilterRemove onClick={() => updateFilter('type', 'all')}>✕</FilterRemove>
+                </ActiveFilter>
+              )}
+              {filters.status !== 'all' && (
+                <ActiveFilter>
+                  Stav: {getStatusLabel(filters.status)}
+                  <FilterRemove onClick={() => updateFilter('status', 'all')}>✕</FilterRemove>
+                </ActiveFilter>
+              )}
+              {filters.dateFrom && (
+                <ActiveFilter>
+                  Od: {new Date(filters.dateFrom).toLocaleDateString('cs-CZ')}
+                  <FilterRemove onClick={() => updateFilter('dateFrom', '')}>✕</FilterRemove>
+                </ActiveFilter>
+              )}
+              {filters.dateTo && (
+                <ActiveFilter>
+                  Do: {new Date(filters.dateTo).toLocaleDateString('cs-CZ')}
+                  <FilterRemove onClick={() => updateFilter('dateTo', '')}>✕</FilterRemove>
+                </ActiveFilter>
+              )}
+              {filters.uploadedBy !== 'all' && (
+                <ActiveFilter>
+                  Uživatel: {filters.uploadedBy}
+                  <FilterRemove onClick={() => updateFilter('uploadedBy', 'all')}>✕</FilterRemove>
+                </ActiveFilter>
+              )}
+              {(filters.sortBy !== 'date' || filters.sortDirection !== 'desc') && (
+                <ActiveFilter>
+                  Řazení: {getSortLabel(filters.sortBy)} {filters.sortDirection === 'asc' ? '↑' : '↓'}
+                  <FilterRemove onClick={() => {
+                    updateFilter('sortBy', 'date');
+                    updateFilter('sortDirection', 'desc');
+                  }}>✕</FilterRemove>
+                </ActiveFilter>
+              )}
+            </ActiveFiltersList>
+          </ActiveFilters>
+        )}
+      </SearchContent>
     </SearchContainer>
   );
 }
 
 // Styled Components
-const SearchContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: ${props => props.theme.spacing.lg};
+const SearchContainer = styled(Card)`
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 2rem;
 `;
 
 const SearchHeader = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: ${props => props.theme.spacing.lg};
-  
-  @media (max-width: 1024px) {
-    flex-direction: column;
-    align-items: stretch;
-  }
+  padding: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
 `;
 
-const SearchBarSection = styled.div`
+const SearchTitle = styled.h3`
+  margin: 0;
+  color: #fff;
+  font-size: 1.25rem;
+`;
+
+const ResultCount = styled.div`
+  color: #8b8b8b;
+  font-size: 0.875rem;
+`;
+
+const SearchContent = styled.div`
+  padding: 1.5rem;
+`;
+
+const BasicSearch = styled.div`
   display: flex;
-  align-items: center;
-  gap: ${props => props.theme.spacing.lg};
-  flex: 1;
-  
-  @media (max-width: 768px) {
-    flex-direction: column;
-    align-items: stretch;
-  }
+  flex-direction: column;
+  gap: 1rem;
 `;
 
-const SearchInputContainer = styled.div`
-  position: relative;
-  flex: 1;
-  max-width: 500px;
-`;
-
-const SearchIcon = styled.span`
-  position: absolute;
-  left: ${props => props.theme.spacing.md};
-  top: 50%;
-  transform: translateY(-50%);
-  color: ${props => props.theme.colors.textSecondary};
-  font-size: ${props => props.theme.typography.fontSize.lg};
+const SearchInputGroup = styled.div`
+  display: flex;
+  gap: 0.5rem;
 `;
 
 const SearchInput = styled.input`
-  width: 100%;
-  padding: ${props => props.theme.spacing.md} ${props => props.theme.spacing.md} ${props => props.theme.spacing.md} ${props => props.theme.spacing['3xl']};
-  border: 2px solid ${props => props.theme.colors.border};
-  border-radius: ${props => props.theme.borderRadius.lg};
-  background: ${props => props.theme.colors.background};
-  color: ${props => props.theme.colors.text};
-  font-size: ${props => props.theme.typography.fontSize.md};
-  
-  &:focus {
-    outline: none;
-    border-color: ${props => props.theme.colors.primary};
-    box-shadow: 0 0 0 3px ${props => props.theme.colors.primary}20;
-  }
+  flex: 1;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.875rem;
 
   &::placeholder {
-    color: ${props => props.theme.colors.textSecondary};
+    color: #8b8b8b;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: rgba(103, 126, 234, 0.4);
   }
 `;
 
-const ClearButton = styled.button`
-  position: absolute;
-  right: ${props => props.theme.spacing.md};
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  color: ${props => props.theme.colors.textSecondary};
+const SearchButton = styled.button`
+  padding: 0.75rem 1rem;
+  background: rgba(103, 126, 234, 0.2);
+  border: 1px solid rgba(103, 126, 234, 0.4);
+  border-radius: 8px;
+  color: #667eea;
   cursor: pointer;
-  font-size: ${props => props.theme.typography.fontSize.lg};
-  padding: ${props => props.theme.spacing.xs};
-  border-radius: ${props => props.theme.borderRadius.sm};
-  
-  &:hover {
-    background: ${props => props.theme.colors.surface};
-    color: ${props => props.theme.colors.text};
+  transition: all 0.2s;
+
+  &:hover:not(:disabled) {
+    background: rgba(103, 126, 234, 0.3);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 `;
 
-const QuickActions = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${props => props.theme.spacing.md};
-  
-  @media (max-width: 768px) {
-    justify-content: center;
-  }
-`;
-
-const ViewModeSelector = styled.div`
-  display: flex;
-  background: ${props => props.theme.colors.background};
-  border: 1px solid ${props => props.theme.colors.border};
-  border-radius: ${props => props.theme.borderRadius.lg};
-  overflow: hidden;
-`;
-
-const ViewModeButton = styled.button<{ $isActive: boolean }>`
-  padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.md};
-  border: none;
-  background: ${props => props.$isActive 
-    ? props.theme.colors.primary 
-    : 'transparent'
-  };
-  color: ${props => props.$isActive 
-    ? 'white' 
-    : props.theme.colors.text
-  };
-  cursor: pointer;
-  transition: all ${props => props.theme.transitions.fast};
-  font-size: ${props => props.theme.typography.fontSize.lg};
-
-  &:hover {
-    background: ${props => props.$isActive 
-      ? props.theme.colors.primary 
-      : props.theme.colors.surface
-    };
-  }
-`;
-
-const StatusAlert = styled.div<{ $level: 'success' | 'info' | 'warning' }>`
-  display: flex;
-  align-items: center;
-  gap: ${props => props.theme.spacing.sm};
-  padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.md};
-  border-radius: ${props => props.theme.borderRadius.lg};
-  background: ${props => {
-    const colors = {
-      success: 'rgba(16, 185, 129, 0.1)',
-      info: 'rgba(59, 130, 246, 0.1)',
-      warning: 'rgba(245, 158, 11, 0.1)'
-    };
-    return colors[props.$level];
-  }};
-  border: 1px solid ${props => {
-    const colors = {
-      success: 'rgba(16, 185, 129, 0.3)',
-      info: 'rgba(59, 130, 246, 0.3)',
-      warning: 'rgba(245, 158, 11, 0.3)'
-    };
-    return colors[props.$level];
-  }};
-`;
-
-const AlertIcon = styled.span`
-  font-size: ${props => props.theme.typography.fontSize.lg};
-`;
-
-const AlertMessage = styled.span`
-  font-size: ${props => props.theme.typography.fontSize.sm};
-  font-weight: ${props => props.theme.typography.fontWeight.medium};
-  color: ${props => props.theme.colors.text};
-`;
-
-const QuickFiltersSection = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: ${props => props.theme.spacing.lg};
-  
-  @media (max-width: 768px) {
-    flex-direction: column;
-    align-items: stretch;
-  }
-`;
-
-const QuickFiltersList = styled.div`
-  display: flex;
-  gap: ${props => props.theme.spacing.sm};
-  flex-wrap: wrap;
-`;
-
-const QuickFilterButton = styled.button<{ $color: string }>`
-  padding: ${props => props.theme.spacing.xs} ${props => props.theme.spacing.sm};
-  border: 1px solid ${props => props.$color}40;
-  background: ${props => props.$color}10;
-  color: ${props => props.$color};
-  border-radius: ${props => props.theme.borderRadius.md};
-  cursor: pointer;
-  transition: all ${props => props.theme.transitions.fast};
-  font-size: ${props => props.theme.typography.fontSize.sm};
-  white-space: nowrap;
-
-  &:hover {
-    background: ${props => props.$color}20;
-    transform: translateY(-1px);
-  }
-`;
-
-const FilterToggle = styled.button`
-  padding: ${props => props.theme.spacing.sm} ${props => props.theme.spacing.md};
-  border: 1px solid ${props => props.theme.colors.border};
-  background: ${props => props.theme.colors.background};
-  color: ${props => props.theme.colors.text};
-  border-radius: ${props => props.theme.borderRadius.md};
-  cursor: pointer;
-  transition: all ${props => props.theme.transitions.fast};
-  font-size: ${props => props.theme.typography.fontSize.sm};
-
-  &:hover {
-    background: ${props => props.theme.colors.surface};
-  }
-`;
-
-const AdvancedFilters = styled.div``;
-
-const FiltersGrid = styled.div`
+const QuickFilters = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: ${props => props.theme.spacing.lg};
-  margin-bottom: ${props => props.theme.spacing.lg};
+  gap: 1rem;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
 `;
 
 const FilterGroup = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${props => props.theme.spacing.sm};
+  gap: 0.5rem;
 `;
 
 const FilterLabel = styled.label`
-  font-size: ${props => props.theme.typography.fontSize.sm};
-  font-weight: ${props => props.theme.typography.fontWeight.medium};
-  color: ${props => props.theme.colors.text};
+  color: #8b8b8b;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 `;
 
-const FilterSelect = styled.select`
-  padding: ${props => props.theme.spacing.sm};
-  border: 1px solid ${props => props.theme.colors.border};
-  border-radius: ${props => props.theme.borderRadius.md};
-  background: ${props => props.theme.colors.background};
-  color: ${props => props.theme.colors.text};
-  
+const QuickSelect = styled.select`
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+
   &:focus {
     outline: none;
-    border-color: ${props => props.theme.colors.primary};
+    border-color: rgba(103, 126, 234, 0.4);
+  }
+
+  option {
+    background: #1a1a2e;
+    color: #fff;
   }
 `;
 
-const SortControls = styled.div`
+const SortContainer = styled.div`
   display: flex;
-  gap: ${props => props.theme.spacing.sm};
+  gap: 0.5rem;
 `;
 
-const SortOrderButton = styled.button`
-  padding: ${props => props.theme.spacing.sm};
-  border: 1px solid ${props => props.theme.colors.border};
-  border-radius: ${props => props.theme.borderRadius.md};
-  background: ${props => props.theme.colors.background};
-  color: ${props => props.theme.colors.text};
+const SortDirectionButton = styled.button`
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #8b8b8b;
   cursor: pointer;
-  font-size: ${props => props.theme.typography.fontSize.lg};
-  min-width: 40px;
-  
+  transition: all 0.2s;
+  font-size: 0.875rem;
+
   &:hover {
-    background: ${props => props.theme.colors.surface};
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
   }
 `;
 
-const FilterActions = styled.div`
+const SearchActions = styled.div`
   display: flex;
-  justify-content: flex-end;
-  gap: ${props => props.theme.spacing.md};
+  gap: 1rem;
+  align-items: center;
 `;
 
-const DocumentStats = styled.div``;
+const AdvancedToggle = styled.button`
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #8b8b8b;
+  font-family: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
 
-const StatsCard = styled.div`
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: ${props => props.theme.spacing.md};
-  padding: ${props => props.theme.spacing.lg};
-  background: ${props => props.theme.colors.surface};
-  border-radius: ${props => props.theme.borderRadius.lg};
-  border: 1px solid ${props => props.theme.colors.border};
-  
-  @media (max-width: 1024px) {
-    grid-template-columns: repeat(3, 1fr);
-  }
-  
-  @media (max-width: 768px) {
-    grid-template-columns: repeat(2, 1fr);
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
   }
 `;
 
-const StatItem = styled.div<{ $status?: string }>`
+const ResetButton = styled.button`
+  padding: 0.5rem 1rem;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 6px;
+  color: #ef4444;
+  font-family: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: rgba(239, 68, 68, 0.2);
+  }
+`;
+
+const AdvancedSearch = styled.div`
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+`;
+
+const AdvancedTitle = styled.h4`
+  margin: 0 0 1rem 0;
+  color: #fff;
+  font-size: 1rem;
+`;
+
+const AdvancedFilters = styled.div`
   display: flex;
   flex-direction: column;
+  gap: 1.5rem;
+`;
+
+const FilterRow = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const DateInput = styled.input`
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.875rem;
+
+  &:focus {
+    outline: none;
+    border-color: rgba(103, 126, 234, 0.4);
+  }
+`;
+
+const TagInput = styled.div`
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+`;
+
+const TagInputField = styled.input`
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.875rem;
+
+  &::placeholder {
+    color: #8b8b8b;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: rgba(103, 126, 234, 0.4);
+  }
+`;
+
+const AddTagButton = styled.button`
+  padding: 0.5rem 1rem;
+  background: rgba(103, 126, 234, 0.2);
+  border: 1px solid rgba(103, 126, 234, 0.4);
+  border-radius: 6px;
+  color: #667eea;
+  font-family: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+
+  &:hover:not(:disabled) {
+    background: rgba(103, 126, 234, 0.3);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
+const TagList = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+`;
+
+const Tag = styled.div`
+  display: flex;
   align-items: center;
-  text-align: center;
-  padding: ${props => props.theme.spacing.sm};
-  border-radius: ${props => props.theme.borderRadius.md};
-  background: ${props => {
-    const colors = {
-      warning: 'rgba(245, 158, 11, 0.1)',
-      neutral: 'transparent'
-    };
-    return colors[props.$status as keyof typeof colors] || 'transparent';
-  }};
-  border: 1px solid ${props => {
-    const colors = {
-      warning: 'rgba(245, 158, 11, 0.3)',
-      neutral: 'transparent'
-    };
-    return colors[props.$status as keyof typeof colors] || 'transparent';
-  }};
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background: rgba(103, 126, 234, 0.2);
+  border: 1px solid rgba(103, 126, 234, 0.4);
+  border-radius: 4px;
+  color: #667eea;
+  font-size: 0.75rem;
 `;
 
-const StatIcon = styled.div`
-  font-size: ${props => props.theme.typography.fontSize.lg};
-  margin-bottom: ${props => props.theme.spacing.xs};
+const TagRemove = styled.button`
+  background: none;
+  border: none;
+  color: #667eea;
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.75rem;
+
+  &:hover {
+    color: #ef4444;
+  }
 `;
 
-const StatValue = styled.div`
-  font-size: ${props => props.theme.typography.fontSize.lg};
-  font-weight: ${props => props.theme.typography.fontWeight.bold};
-  color: ${props => props.theme.colors.text};
-  margin-bottom: ${props => props.theme.spacing.xs};
+const SuggestedTags = styled.div``;
+
+const SuggestedTagsLabel = styled.div`
+  color: #8b8b8b;
+  font-size: 0.75rem;
+  margin-bottom: 0.5rem;
 `;
 
-const StatLabel = styled.div`
-  font-size: ${props => props.theme.typography.fontSize.xs};
-  color: ${props => props.theme.colors.textSecondary};
+const SuggestedTagsList = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
 `;
+
+const SuggestedTag = styled.button`
+  padding: 0.25rem 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: #8b8b8b;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: rgba(103, 126, 234, 0.1);
+    border-color: rgba(103, 126, 234, 0.2);
+    color: #667eea;
+  }
+`;
+
+const ActiveFilters = styled.div`
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+`;
+
+const ActiveFiltersTitle = styled.div`
+  color: #8b8b8b;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.75rem;
+`;
+
+const ActiveFiltersList = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+`;
+
+const ActiveFilter = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(103, 126, 234, 0.1);
+  border: 1px solid rgba(103, 126, 234, 0.2);
+  border-radius: 6px;
+  color: #667eea;
+  font-size: 0.875rem;
+`;
+
+const FilterRemove = styled.button`
+  background: none;
+  border: none;
+  color: #667eea;
+  cursor: pointer;
+  padding: 0;
+  font-size: 0.75rem;
+
+  &:hover {
+    color: #ef4444;
+  }
+`;
+
+export default DocumentSearch;

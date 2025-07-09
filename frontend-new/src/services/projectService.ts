@@ -1,133 +1,85 @@
-// src/services/projectService.ts - Project API operations
-import { apiClient } from './api';
-import type { 
-  Project, 
-  ProjectsResponse, 
-  CreateProjectRequest, 
-  UpdateProjectRequest,
-  ProjectFilters 
-} from '../types/project';
+// src/services/projectService.ts - REAL API with unified types
+import apiClient from './apiClient';
+import type { Project, ProjectsResponse } from '../types';
 
 class ProjectService {
-  private readonly endpoint = '/projects';
-
-  // Get all projects with filtering
-  async getProjects(filters: ProjectFilters = {}): Promise<ProjectsResponse> {
-    const params = new URLSearchParams();
-    
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        if (Array.isArray(value)) {
-          value.forEach(v => params.append(key, v));
-        } else {
-          params.append(key, value.toString());
-        }
+  async getProjects(): Promise<Project[]> {
+    try {
+      console.log('🎬 Fetching projects from API...');
+      const response = await apiClient.get<ProjectsResponse>('/production/productions/');
+      
+      console.log('✅ Projects API response:', response);
+      
+      // Handle paginated response
+      if (response?.results && Array.isArray(response.results)) {
+        return response.results;
       }
-    });
-
-    const queryString = params.toString();
-    const url = queryString ? `${this.endpoint}?${queryString}` : this.endpoint;
-    
-    return apiClient.get<ProjectsResponse>(url);
+      
+      // Fallback for direct array
+      if (Array.isArray(response)) {
+        return response;
+      }
+      
+      console.warn('⚠️ Unexpected projects response format:', response);
+      return [];
+      
+    } catch (error) {
+      console.error('❌ Failed to fetch projects:', error);
+      throw error;
+    }
   }
 
-  // Get single project by ID
   async getProject(id: string): Promise<Project> {
-    return apiClient.get<Project>(`${this.endpoint}/${id}/`);
+    try {
+      console.log(`🎬 Fetching project ${id} from API...`);
+      const response = await apiClient.get<Project>(`/production/productions/${id}/`);
+      return response;
+    } catch (error) {
+      console.error(`❌ Failed to fetch project ${id}:`, error);
+      throw error;
+    }
   }
 
-  // Create new project
-  async createProject(data: CreateProjectRequest): Promise<Project> {
-    return apiClient.post<Project>(`${this.endpoint}/`, data);
+  async createProject(data: Partial<Project>): Promise<Project> {
+    try {
+      console.log('🎬 Creating project:', data);
+      const response = await apiClient.post<Project>('/production/productions/', data);
+      return response;
+    } catch (error) {
+      console.error('❌ Failed to create project:', error);
+      throw error;
+    }
   }
 
-  // Update existing project
-  async updateProject(id: string, data: Partial<UpdateProjectRequest>): Promise<Project> {
-    return apiClient.patch<Project>(`${this.endpoint}/${id}/`, data);
+  async updateProject(id: string, data: Partial<Project>): Promise<Project> {
+    try {
+      console.log(`🎬 Updating project ${id}:`, data);
+      const response = await apiClient.patch<Project>(`/production/productions/${id}/`, data);
+      return response;
+    } catch (error) {
+      console.error(`❌ Failed to update project ${id}:`, error);
+      throw error;
+    }
   }
 
-  // Delete project
   async deleteProject(id: string): Promise<void> {
-    return apiClient.delete<void>(`${this.endpoint}/${id}/`);
-  }
-
-  // Get project statistics
-  async getProjectStats(id: string): Promise<any> {
-    return apiClient.get<any>(`${this.endpoint}/${id}/stats/`);
-  }
-
-  // Update project status
-  async updateProjectStatus(id: string, status: Project['status']): Promise<Project> {
-    return apiClient.patch<Project>(`${this.endpoint}/${id}/`, { status });
-  }
-
-  // Add team member to project
-  async addTeamMember(projectId: string, memberData: any): Promise<any> {
-    return apiClient.post<any>(`${this.endpoint}/${projectId}/team/`, memberData);
-  }
-
-  // Remove team member from project
-  async removeTeamMember(projectId: string, memberId: string): Promise<void> {
-    return apiClient.delete<void>(`${this.endpoint}/${projectId}/team/${memberId}/`);
-  }
-
-  // Upload project document
-  async uploadDocument(projectId: string, file: File, metadata: any): Promise<any> {
-    const formData = new FormData();
-    formData.append('file', file);
-    Object.entries(metadata).forEach(([key, value]) => {
-      formData.append(key, value as string);
-    });
-
-    const response = await fetch(`${apiClient['baseURL']}${this.endpoint}/${projectId}/documents/`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('authToken')}`,
-      },
-      body: formData,
-    });
-
-    if (!response.ok) {
-      throw new Error('Upload failed');
+    try {
+      console.log(`🎬 Deleting project ${id}`);
+      await apiClient.delete(`/production/productions/${id}/`);
+    } catch (error) {
+      console.error(`❌ Failed to delete project ${id}:`, error);
+      throw error;
     }
-
-    return response.json();
   }
 
-  // Get project timeline/schedule
-  async getProjectTimeline(id: string): Promise<any> {
-    return apiClient.get<any>(`${this.endpoint}/${id}/timeline/`);
-  }
-
-  // Update project budget
-  async updateBudget(id: string, budgetData: any): Promise<Project> {
-    return apiClient.patch<Project>(`${this.endpoint}/${id}/budget/`, budgetData);
-  }
-
-  // Duplicate project
-  async duplicateProject(id: string, newTitle: string): Promise<Project> {
-    return apiClient.post<Project>(`${this.endpoint}/${id}/duplicate/`, { title: newTitle });
-  }
-
-  // Archive project
-  async archiveProject(id: string): Promise<Project> {
-    return apiClient.patch<Project>(`${this.endpoint}/${id}/`, { status: 'completed' });
-  }
-
-  // Get project export data
-  async exportProject(id: string, format: 'pdf' | 'excel' | 'json' = 'json'): Promise<Blob> {
-    const response = await fetch(`${apiClient['baseURL']}${this.endpoint}/${id}/export/?format=${format}`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem('authToken')}`,
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error('Export failed');
-    }
-
-    return response.blob();
+  // Helper method to get active projects for assignments
+  async getActiveProjects(): Promise<Project[]> {
+    const allProjects = await this.getProjects();
+    return allProjects.filter(project => 
+      project.status === 'production' || project.status === 'pre_production'
+    );
   }
 }
 
-export const projectService = new ProjectService();
+const projectService = new ProjectService();
+export default projectService;

@@ -1,15 +1,9 @@
-// src/styles/GlobalStyles.ts - Cinematic Global Styles
+// src/styles/GlobalStyles.ts - Cinema-Grade Global Styles
 import { createGlobalStyle } from 'styled-components';
-import theme, { type Theme } from './theme';
+import type { Theme } from './theme';
 
 export const GlobalStyles = createGlobalStyle<{ theme: Theme }>`
-  /* Import cinematic fonts */
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap');
-  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
-  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;1,100;1,200;1,300;1,400&display=swap');
-  @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap');
-
-  /* CSS Reset & Base */
+  /* CSS Reset & Cinema Base */
   *, *::before, *::after {
     box-sizing: border-box;
     margin: 0;
@@ -26,383 +20,144 @@ export const GlobalStyles = createGlobalStyle<{ theme: Theme }>`
   }
 
   body {
-    font-family: ${props => props.theme.typography.fontFamily.sans};
-    color: ${props => props.theme.colors.text};
-    background: ${props => props.theme.colors.background};
-    font-size: ${props => props.theme.typography.fontSize.base};
-    line-height: ${props => props.theme.typography.lineHeight.normal};
-    font-weight: ${props => props.theme.typography.fontWeight.normal};
+    font-family: ${({ theme }) => theme.typography.fontFamily.body};
+    background: ${({ theme }) => theme.colors.background.primary};
+    color: ${({ theme }) => theme.colors.text.primary};
+    font-size: ${({ theme }) => theme.typography.fontSize.base};
+    line-height: ${({ theme }) => theme.typography.lineHeight.normal};
+    font-weight: ${({ theme }) => theme.typography.fontWeight.normal};
     overflow-x: hidden;
     
-    /* Cinema-grade background texture */
-    background: 
-      radial-gradient(circle at 20% 80%, rgba(249, 115, 22, 0.03) 0%, transparent 50%),
-      radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.02) 0%, transparent 50%),
-      radial-gradient(circle at 40% 40%, rgba(6, 182, 212, 0.01) 0%, transparent 50%),
-      ${props => props.theme.colors.background};
-      
-    /* Ultra-subtle film grain */
-    &::before {
-      content: '';
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-      opacity: 0.015;
-      background-image: 
-        radial-gradient(circle, transparent 1px, rgba(0,0,0,0.05) 1px);
-      background-size: 4px 4px;
-      animation: grain 8s steps(10) infinite;
-      z-index: 1;
-    }
+    /* Cinema background with subtle pattern */
+    background-image: 
+      radial-gradient(circle at 20% 80%, rgba(102, 126, 234, 0.1) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(139, 92, 246, 0.08) 0%, transparent 50%),
+      url("data:image/svg+xml,%3Csvg width='120' height='120' viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23f8fafc' fill-opacity='0.01'%3E%3Ccircle cx='60' cy='60' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
   }
 
-  @keyframes grain {
-    0%, 100% { transform: translate(0, 0); }
-    10% { transform: translate(-5%, -10%); }
-    20% { transform: translate(-15%, 5%); }
-    30% { transform: translate(7%, -25%); }
-    40% { transform: translate(-5%, 25%); }
-    50% { transform: translate(-15%, 10%); }
-    60% { transform: translate(15%, 0%); }
-    70% { transform: translate(0%, 15%); }
-    80% { transform: translate(3%, 35%); }
-    90% { transform: translate(-10%, 10%); }
+  /* Cinema Selection */
+  ::selection {
+    background: ${({ theme }) => theme.colors.text.accent}40;
+    color: ${({ theme }) => theme.colors.text.primary};
   }
 
-  #root {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    position: relative;
-    z-index: 2;
+  ::-moz-selection {
+    background: ${({ theme }) => theme.colors.text.accent}40;
+    color: ${({ theme }) => theme.colors.text.primary};
   }
 
-  /* Cinematic Typography System */
-  h1, h2, h3, h4, h5, h6 {
-    font-family: ${props => props.theme.typography.fontFamily.display};
-    color: ${props => props.theme.colors.text};
-    font-weight: ${props => props.theme.typography.fontWeight.bold};
-    line-height: ${props => props.theme.typography.lineHeight.tight};
-    margin-bottom: ${props => props.theme.spacing.lg};
-    letter-spacing: ${props => props.theme.typography.letterSpacing.tight};
-    
-    /* Cinematic text shadow */
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    
-    /* Optional gradient text for special headings */
-    &.gradient-text {
-      background: ${props => props.theme.colors.gradients.text};
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-  }
-
-  h1 { 
-    font-size: clamp(${props => props.theme.typography.fontSize['3xl']}, 8vw, ${props => props.theme.typography.fontSize['6xl']}); 
-    font-weight: ${props => props.theme.typography.fontWeight.black};
-    letter-spacing: ${props => props.theme.typography.letterSpacing.tighter};
-  }
-  
-  h2 { 
-    font-size: clamp(${props => props.theme.typography.fontSize['2xl']}, 6vw, ${props => props.theme.typography.fontSize['5xl']}); 
-    font-weight: ${props => props.theme.typography.fontWeight.extrabold};
-  }
-  
-  h3 { 
-    font-size: clamp(${props => props.theme.typography.fontSize.xl}, 4vw, ${props => props.theme.typography.fontSize['3xl']}); 
-    font-weight: ${props => props.theme.typography.fontWeight.bold};
-  }
-  
-  h4 { 
-    font-size: ${props => props.theme.typography.fontSize['2xl']}; 
-    font-weight: ${props => props.theme.typography.fontWeight.semibold};
-  }
-  
-  h5 { 
-    font-size: ${props => props.theme.typography.fontSize.xl}; 
-    font-weight: ${props => props.theme.typography.fontWeight.medium};
-  }
-  
-  h6 { 
-    font-size: ${props => props.theme.typography.fontSize.lg}; 
-    font-weight: ${props => props.theme.typography.fontWeight.medium};
-    text-transform: uppercase;
-    letter-spacing: ${props => props.theme.typography.letterSpacing.widest};
-    color: ${props => props.theme.colors.textSecondary};
-  }
-
-  p {
-    margin-bottom: ${props => props.theme.spacing.lg};
-    color: ${props => props.theme.colors.text};
-    line-height: ${props => props.theme.typography.lineHeight.relaxed};
-    font-weight: ${props => props.theme.typography.fontWeight.normal};
-    
-    &.large {
-      font-size: ${props => props.theme.typography.fontSize.lg};
-      font-family: ${props => props.theme.typography.fontFamily.elegant};
-    }
-    
-    &.small {
-      font-size: ${props => props.theme.typography.fontSize.sm};
-      color: ${props => props.theme.colors.textSecondary};
-    }
-  }
-
-  /* Enhanced Interactive Elements */
-  a {
-    color: ${props => props.theme.colors.primary};
-    text-decoration: none;
-    transition: all ${props => props.theme.transitions.normal};
-    position: relative;
-    font-weight: ${props => props.theme.typography.fontWeight.medium};
-
-    &:hover {
-      color: ${props => props.theme.colors.primaryDark};
-      transform: translateY(-1px);
-    }
-
-    &:focus {
-      outline: none;
-      border-radius: ${props => props.theme.borderRadius.sm};
-      box-shadow: 0 0 0 3px ${props => props.theme.colors.primary}40;
-    }
-
-    /* Cinematic underline animation */
-    &::after {
-      content: '';
-      position: absolute;
-      bottom: -2px;
-      left: 0;
-      width: 0;
-      height: 2px;
-      background: ${props => props.theme.colors.gradients.sunset};
-      transition: width ${props => props.theme.transitions.spring};
-      border-radius: ${props => props.theme.borderRadius.full};
-    }
-
-    &:hover::after {
-      width: 100%;
-    }
-  }
-
-  /* Glass Morphism Button System */
-  button {
-    font-family: inherit;
-    cursor: pointer;
-    border: none;
-    background: none;
-    transition: all ${props => props.theme.transitions.normal};
-    font-weight: ${props => props.theme.typography.fontWeight.medium};
-    position: relative;
-    overflow: hidden;
-
-    &:focus {
-      outline: none;
-      box-shadow: 0 0 0 3px ${props => props.theme.colors.primary}40;
-    }
-
-    &:disabled {
-      cursor: not-allowed;
-      opacity: 0.4;
-    }
-
-    /* Glass button variant */
-    &.glass {
-      background: ${props => props.theme.glass.light.background};
-      backdrop-filter: ${props => props.theme.glass.light.backdrop};
-      border: 1px solid ${props => props.theme.glass.light.border};
-      
-      &:hover {
-        background: ${props => props.theme.glass.medium.background};
-        transform: translateY(-2px);
-        box-shadow: ${props => props.theme.shadows.glassSm};
-      }
-    }
-
-    /* Shimmer effect for premium buttons */
-    &.shimmer::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: -100%;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
-      transition: left 0.6s;
-    }
-
-    &.shimmer:hover::before {
-      left: 100%;
-    }
-  }
-
-  /* Cinematic Form Elements */
-  input, textarea, select {
-    font-family: inherit;
-    font-size: inherit;
-    border: 2px solid ${props => props.theme.colors.border};
-    border-radius: ${props => props.theme.borderRadius['2xl']};
-    padding: ${props => props.theme.spacing.lg} ${props => props.theme.spacing['2xl']};
-    transition: all ${props => props.theme.transitions.normal};
-    background: ${props => props.theme.glass.light.background};
-    backdrop-filter: ${props => props.theme.glass.light.backdrop};
-    font-weight: ${props => props.theme.typography.fontWeight.normal};
-
-    &:focus {
-      outline: none;
-      border-color: ${props => props.theme.colors.primary};
-      box-shadow: 
-        0 0 0 4px ${props => props.theme.colors.primary}20,
-        ${props => props.theme.shadows.glassSm};
-      transform: translateY(-2px);
-    }
-
-    &::placeholder {
-      color: ${props => props.theme.colors.textMuted};
-      font-style: italic;
-      font-weight: ${props => props.theme.typography.fontWeight.light};
-    }
-
-    &:disabled {
-      background: ${props => props.theme.colors.background};
-      cursor: not-allowed;
-      opacity: 0.5;
-    }
-  }
-
-  textarea {
-    resize: vertical;
-    min-height: 140px;
-    line-height: ${props => props.theme.typography.lineHeight.relaxed};
-  }
-
-  /* Enhanced Tables */
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-bottom: ${props => props.theme.spacing['2xl']};
-    background: ${props => props.theme.glass.light.background};
-    backdrop-filter: ${props => props.theme.glass.light.backdrop};
-    border-radius: ${props => props.theme.borderRadius['2xl']};
-    overflow: hidden;
-    box-shadow: ${props => props.theme.shadows.glassSm};
-  }
-
-  th, td {
-    padding: ${props => props.theme.spacing.lg} ${props => props.theme.spacing.xl};
-    text-align: left;
-    border-bottom: 1px solid ${props => props.theme.colors.border};
-    transition: background-color ${props => props.theme.transitions.fast};
-  }
-
-  th {
-    font-weight: ${props => props.theme.typography.fontWeight.semibold};
-    color: ${props => props.theme.colors.text};
-    background: ${props => props.theme.glass.medium.background};
-    font-size: ${props => props.theme.typography.fontSize.sm};
-    text-transform: uppercase;
-    letter-spacing: ${props => props.theme.typography.letterSpacing.wider};
-  }
-
-  tr:hover td {
-    background: ${props => props.theme.colors.surfaceHover};
-  }
-
-  /* Cinematic Code Styling */
-  code, pre {
-    font-family: ${props => props.theme.typography.fontFamily.mono};
-    font-size: ${props => props.theme.typography.fontSize.sm};
-  }
-
-  code {
-    background: ${props => props.theme.glass.light.background};
-    padding: 0.25em 0.5em;
-    border-radius: ${props => props.theme.borderRadius.md};
-    color: ${props => props.theme.colors.accent};
-    font-weight: ${props => props.theme.typography.fontWeight.medium};
-    border: 1px solid ${props => props.theme.colors.borderAccent};
-  }
-
-  pre {
-    background: ${props => props.theme.glass.medium.background};
-    backdrop-filter: ${props => props.theme.glass.medium.backdrop};
-    padding: ${props => props.theme.spacing.xl};
-    border-radius: ${props => props.theme.borderRadius['2xl']};
-    overflow-x: auto;
-    margin-bottom: ${props => props.theme.spacing.xl};
-    border-left: 4px solid ${props => props.theme.colors.primary};
-    box-shadow: ${props => props.theme.shadows.glassSm};
-  }
-
-  /* Ultra-Modern Scrollbars */
+  /* Cinema Scrollbars */
   ::-webkit-scrollbar {
-    width: 12px;
-    height: 12px;
+    width: 8px;
+    height: 8px;
   }
 
   ::-webkit-scrollbar-track {
-    background: ${props => props.theme.glass.light.background};
-    border-radius: ${props => props.theme.borderRadius.full};
-    margin: 4px;
+    background: ${({ theme }) => theme.colors.background.secondary};
+    border-radius: 10px;
   }
 
   ::-webkit-scrollbar-thumb {
-    background: ${props => props.theme.colors.gradients.sunset};
-    border-radius: ${props => props.theme.borderRadius.full};
-    border: 2px solid transparent;
-    background-clip: content-box;
+    background: ${({ theme }) => theme.colors.gradients.primary};
+    border-radius: 10px;
+    border: 2px solid ${({ theme }) => theme.colors.background.secondary};
+  }
 
+  ::-webkit-scrollbar-thumb:hover {
+    background: ${({ theme }) => theme.colors.text.accent};
+  }
+
+  /* Cinema Glass Effects */
+  .glass-light {
+    background: ${({ theme }) => theme.colors.glass.surface};
+    backdrop-filter: ${({ theme }) => theme.cinema.backdrop.light};
+    border: 1px solid ${({ theme }) => theme.colors.glass.border};
+  }
+
+  .glass-medium {
+    background: ${({ theme }) => theme.colors.glass.surfaceHover};
+    backdrop-filter: ${({ theme }) => theme.cinema.backdrop.medium};
+    border: 1px solid ${({ theme }) => theme.colors.glass.borderHover};
+  }
+
+  .glass-heavy {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: ${({ theme }) => theme.cinema.backdrop.heavy};
+    border: 1px solid rgba(255, 255, 255, 0.25);
+  }
+
+  /* Interactive Cinema Elements */
+  .interactive {
+    cursor: pointer;
+    transition: ${({ theme }) => theme.transitions.cinema};
+    
     &:hover {
-      background: ${props => props.theme.colors.gradients.ocean};
-      background-clip: content-box;
+      transform: translateY(-2px) scale(1.02);
+    }
+    
+    &:active {
+      transform: translateY(0) scale(0.98);
     }
   }
 
-  ::-webkit-scrollbar-corner {
-    background: transparent;
+  /* Gradient Text Effects */
+  .gradient-text {
+    background: ${({ theme }) => theme.colors.gradients.primary};
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: ${({ theme }) => theme.animation.gradientShift};
   }
 
-  /* Cinematic Selection */
-  ::selection {
-    background: ${props => props.theme.colors.primary}30;
-    color: ${props => props.theme.colors.text};
-    text-shadow: none;
+  .gradient-cinema {
+    background: ${({ theme }) => theme.colors.gradients.cinema};
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
-  /* Loading States with Glass Morphism */
-  .loading {
-    pointer-events: none;
-    opacity: 0.7;
-    position: relative;
-    overflow: hidden;
+  .gradient-golden {
+    background: ${({ theme }) => theme.colors.gradients.golden};
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
-  .loading::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, 
-      transparent, 
-      ${props => props.theme.glass.light.background}, 
-      transparent
-    );
-    animation: shimmer 1.8s infinite;
+  /* Cinema Animations */
+  .fade-in {
+    opacity: 0;
+    transform: translateY(40px);
+    animation: ${({ theme }) => theme.animation.fadeIn};
   }
 
-  /* Enhanced Animations */
-  @keyframes shimmer {
-    0% { left: -100%; }
-    100% { left: 100%; }
+  .slide-up {
+    opacity: 0;
+    transform: translateY(60px);
+    animation: ${({ theme }) => theme.animation.slideUp};
   }
 
-  @keyframes fadeInUp {
+  .scale-in {
+    opacity: 0;
+    transform: scale(0.9);
+    animation: ${({ theme }) => theme.animation.scaleIn};
+  }
+
+  .float {
+    animation: ${({ theme }) => theme.animation.float};
+  }
+
+  .glow {
+    animation: ${({ theme }) => theme.animation.glow};
+  }
+
+  /* Animation Delays */
+  .delay-100 { animation-delay: 100ms; }
+  .delay-200 { animation-delay: 200ms; }
+  .delay-300 { animation-delay: 300ms; }
+  .delay-500 { animation-delay: 500ms; }
+
+  /* Cinema Keyframes */
+  @keyframes fadeIn {
     from {
       opacity: 0;
       transform: translateY(40px);
@@ -413,21 +168,21 @@ export const GlobalStyles = createGlobalStyle<{ theme: Theme }>`
     }
   }
 
-  @keyframes slideInRight {
+  @keyframes slideUp {
     from {
       opacity: 0;
-      transform: translateX(40px);
+      transform: translateY(60px);
     }
     to {
       opacity: 1;
-      transform: translateX(0);
+      transform: translateY(0);
     }
   }
 
   @keyframes scaleIn {
     from {
       opacity: 0;
-      transform: scale(0.8);
+      transform: scale(0.9);
     }
     to {
       opacity: 1;
@@ -435,208 +190,183 @@ export const GlobalStyles = createGlobalStyle<{ theme: Theme }>`
     }
   }
 
+  @keyframes gradientShift {
+    0%, 100% {
+      background-position: 0% 50%;
+    }
+    50% {
+      background-position: 100% 50%;
+    }
+  }
+
   @keyframes float {
-    0%, 100% { transform: translateY(0px); }
-    50% { transform: translateY(-20px); }
+    0%, 100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
   }
 
   @keyframes glow {
-    0%, 100% { 
-      box-shadow: 0 0 5px ${props => props.theme.colors.primary}40; 
+    from {
+      box-shadow: ${({ theme }) => theme.shadows.glow};
     }
-    50% { 
-      box-shadow: 0 0 30px ${props => props.theme.colors.primary}80; 
+    to {
+      box-shadow: ${({ theme }) => theme.shadows.glowHover};
     }
   }
 
   @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.6; }
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.8;
+    }
   }
 
-  @keyframes bounce {
-    0%, 20%, 53%, 80%, 100% { transform: translateY(0); }
-    40%, 43% { transform: translateY(-30px); }
-    70% { transform: translateY(-15px); }
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
   }
 
-  @keyframes rotate {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+  @keyframes ping {
+    75%, 100% {
+      transform: scale(2);
+      opacity: 0;
+    }
   }
 
-  /* Utility Animation Classes */
-  .fade-in-up { animation: fadeInUp 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) both; }
-  .slide-in-right { animation: slideInRight 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) both; }
-  .scale-in { animation: scaleIn 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) both; }
-  .float { animation: float 6s ease-in-out infinite; }
-  .glow { animation: glow 2s ease-in-out infinite; }
-  .pulse { animation: pulse 2s infinite; }
-  .bounce { animation: bounce 1s; }
-  .rotate { animation: rotate 2s linear infinite; }
-
-  /* Delay variations */
-  .delay-100 { animation-delay: 0.1s; }
-  .delay-200 { animation-delay: 0.2s; }
-  .delay-300 { animation-delay: 0.3s; }
-  .delay-500 { animation-delay: 0.5s; }
-
-  /* Glass Morphism Utility Classes */
-  .glass-light {
-    background: ${props => props.theme.glass.light.background};
-    backdrop-filter: ${props => props.theme.glass.light.backdrop};
-    border: 1px solid ${props => props.theme.glass.light.border};
-    box-shadow: ${props => props.theme.shadows.glassSm};
+  /* Cinema Typography Utilities */
+  .text-display {
+    font-family: ${({ theme }) => theme.typography.fontFamily.display};
+    font-weight: ${({ theme }) => theme.typography.fontWeight.light};
+    line-height: ${({ theme }) => theme.typography.lineHeight.tight};
   }
 
-  .glass-medium {
-    background: ${props => props.theme.glass.medium.background};
-    backdrop-filter: ${props => props.theme.glass.medium.backdrop};
-    border: 1px solid ${props => props.theme.glass.medium.border};
-    box-shadow: ${props => props.theme.shadows.glass};
+  .text-body {
+    font-family: ${({ theme }) => theme.typography.fontFamily.body};
+    font-weight: ${({ theme }) => theme.typography.fontWeight.normal};
+    line-height: ${({ theme }) => theme.typography.lineHeight.normal};
   }
 
-  .glass-heavy {
-    background: ${props => props.theme.glass.heavy.background};
-    backdrop-filter: ${props => props.theme.glass.heavy.backdrop};
-    border: 1px solid ${props => props.theme.glass.heavy.border};
-    box-shadow: ${props => props.theme.shadows.glassLg};
+  .text-mono {
+    font-family: ${({ theme }) => theme.typography.fontFamily.mono};
+    font-weight: ${({ theme }) => theme.typography.fontWeight.normal};
+    letter-spacing: 0.025em;
   }
 
-  /* Gradient Text Utility */
-  .gradient-text {
-    background: ${props => props.theme.colors.gradients.text};
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    font-weight: ${props => props.theme.typography.fontWeight.bold};
+  .text-accent {
+    font-family: ${({ theme }) => theme.typography.fontFamily.accent};
+    font-weight: ${({ theme }) => theme.typography.fontWeight.medium};
+    line-height: ${({ theme }) => theme.typography.lineHeight.relaxed};
   }
 
-  /* Status Indicators */
-  .status-development { color: ${props => props.theme.colors.development}; }
-  .status-pre-production { color: ${props => props.theme.colors.preProduction}; }
-  .status-production { color: ${props => props.theme.colors.production}; }
-  .status-post-production { color: ${props => props.theme.colors.postProduction}; }
-  .status-completed { color: ${props => props.theme.colors.completed}; }
-  .status-cancelled { color: ${props => props.theme.colors.cancelled}; }
+  /* Cinema Focus States */
+  *:focus {
+    outline: none;
+  }
 
-  /* Interactive Enhancement */
-  .interactive {
-    transition: all ${props => props.theme.transitions.normal};
+  *:focus-visible {
+    outline: 2px solid ${({ theme }) => theme.colors.text.accent};
+    outline-offset: 2px;
+    border-radius: ${({ theme }) => theme.borderRadius.md};
+  }
+
+  /* Cinema Status Colors */
+  .status-prep { color: ${({ theme }) => theme.colors.status.prep}; }
+  .status-shoot { color: ${({ theme }) => theme.colors.status.shoot}; }
+  .status-post { color: ${({ theme }) => theme.colors.status.post}; }
+  .status-wrap { color: ${({ theme }) => theme.colors.status.wrap}; }
+  .status-archived { color: ${({ theme }) => theme.colors.status.archived}; }
+
+  /* Cinema Button Base */
+  .btn-base {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: ${({ theme }) => theme.spacing[2]};
+    padding: ${({ theme }) => theme.spacing[3]} ${({ theme }) => theme.spacing[6]};
+    border-radius: ${({ theme }) => theme.borderRadius['2xl']};
+    font-family: ${({ theme }) => theme.typography.fontFamily.body};
+    font-weight: ${({ theme }) => theme.typography.fontWeight.medium};
+    font-size: ${({ theme }) => theme.typography.fontSize.sm};
+    line-height: ${({ theme }) => theme.typography.lineHeight.none};
+    border: none;
     cursor: pointer;
-
-    &:hover {
-      transform: translateY(-4px);
-      box-shadow: ${props => props.theme.shadows.xl};
-    }
-
-    &:active {
-      transform: translateY(-2px);
-      transition: all ${props => props.theme.transitions.fast};
-    }
-  }
-
-  /* Screen reader only */
-  .sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
+    transition: ${({ theme }) => theme.transitions.cinema};
+    position: relative;
     overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
-  }
-
-  /* Responsive Utilities */
-  @media (max-width: ${props => props.theme.breakpoints.sm}) {
-    html { font-size: 14px; }
     
-    .hide-mobile { display: none !important; }
-    
-    h1 { font-size: ${props => props.theme.typography.fontSize['3xl']}; }
-    h2 { font-size: ${props => props.theme.typography.fontSize['2xl']}; }
-    h3 { font-size: ${props => props.theme.typography.fontSize.xl}; }
-  }
-
-  @media (min-width: ${props => props.theme.breakpoints.lg}) {
-    .hide-desktop { display: none !important; }
-  }
-
-  /* Accessibility Enhancements */
-  @media (prefers-contrast: high) {
-    button, input, select, textarea {
-      border-width: 3px;
+    &:hover {
+      transform: translateY(-2px);
     }
     
-    a::after {
-      height: 3px;
+    &:active {
+      transform: translateY(0);
+    }
+    
+    &:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
     }
   }
 
-  /* Reduced Motion Support */
+  /* Cinema Card Base */
+  .card-base {
+    background: ${({ theme }) => theme.colors.glass.surface};
+    backdrop-filter: ${({ theme }) => theme.cinema.backdrop.light};
+    border: 1px solid ${({ theme }) => theme.colors.glass.border};
+    border-radius: ${({ theme }) => theme.borderRadius['2xl']};
+    padding: ${({ theme }) => theme.spacing[6]};
+    transition: ${({ theme }) => theme.transitions.cinema};
+    
+    &:hover {
+      background: ${({ theme }) => theme.colors.glass.surfaceHover};
+      border-color: ${({ theme }) => theme.colors.glass.borderHover};
+      transform: translateY(-4px);
+      box-shadow: ${({ theme }) => theme.shadows.cinema};
+    }
+  }
+
+  /* Responsive Cinema Design */
+  @media (max-width: ${({ theme }) => theme.breakpoints.lg}) {
+    body {
+      font-size: ${({ theme }) => theme.typography.fontSize.sm};
+    }
+  }
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.md}) {
+    .fade-in, .slide-up, .scale-in {
+      animation-duration: 0.4s;
+    }
+  }
+
+  /* Accessibility Improvements */
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
-      scroll-behavior: auto !important;
     }
     
-    body::before {
-      animation: none;
+    html {
+      scroll-behavior: auto;
     }
   }
 
-  /* Print Optimization */
-  @media print {
-    * {
-      background: transparent !important;
-      color: black !important;
-      box-shadow: none !important;
-      text-shadow: none !important;
-    }
-
-    .no-print {
-      display: none !important;
-    }
-
-    body::before {
-      display: none;
-    }
-
-    a, a:visited {
-      text-decoration: underline;
-    }
-
-    a[href]:after {
-      content: " (" attr(href) ")";
-    }
-
-    thead {
-      display: table-header-group;
-    }
-
-    tr, img {
-      page-break-inside: avoid;
-    }
-
-    p, h2, h3 {
-      orphans: 3;
-      widows: 3;
-    }
-
-    h2, h3 {
-      page-break-after: avoid;
-    }
-  }
-
-  /* Ultra-wide screen optimizations */
-  @media (min-width: ${props => props.theme.breakpoints['3xl']}) {
-    .container-ultra {
-      max-width: 1600px;
-      margin: 0 auto;
+  /* High contrast mode support */
+  @media (prefers-contrast: high) {
+    .glass-light, .glass-medium, .glass-heavy {
+      background: ${({ theme }) => theme.colors.background.surface};
+      backdrop-filter: none;
+      border: 2px solid ${({ theme }) => theme.colors.text.accent};
     }
   }
 `;

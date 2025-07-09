@@ -1,145 +1,77 @@
-// src/styles/theme.ts - Cinema Grade Design System
 export const Theme = {
+  // 🎨 Cinema Color Palette
   colors: {
-    // Cinematic primary palette
-    primary: '#f97316',        // Sunset orange - like golden hour
-    primaryLight: '#fb923c',   
-    primaryDark: '#ea580c',
-    
-    // Film noir palette
-    secondary: '#1e1b4b',      // Deep midnight blue
-    secondaryLight: '#312e81',
-    secondaryDark: '#0f0e27',
-    
-    // Creative accents
-    accent: '#8b5cf6',         // Director's purple
-    accentLight: '#a78bfa',
-    accentDark: '#7c3aed',
-    
-    // Electric highlights
-    electric: '#06b6d4',       // Cyan highlights
-    electricLight: '#22d3ee',
-    electricDark: '#0891b2',
-    
-    // Status colors - vibrant
-    success: '#10b981',
-    successLight: '#34d399', 
-    warning: '#f59e0b',
-    warningLight: '#fbbf24',
-    error: '#ef4444', 
-    errorLight: '#f87171',
-    danger: '#ef4444',        // Alias pro error (kvůli styled.d.ts)
-    info: '#3b82f6',
-    infoLight: '#60a5fa',
-    
-    // Text system (kvůli styled.d.ts kompatibilitě)
-    text: {
-      primary: '#0f172a',      // Rich black
-      secondary: '#475569',    // Warm grey
-      muted: '#94a3b8',       // Light grey
+    // Primary cinema colors
+    cinema: {
+      midnight: '#0f0f23',      // Deep space black
+      charcoal: '#1a1a2e',      // Rich charcoal 
+      steel: '#16213e',         // Steel blue shadows
+      gold: '#eab308',          // Golden hour
+      silver: '#8892b0',        // Silver screen
+      ruby: '#ef4444',          // Ruby red (danger/action)
+      emerald: '#10b981',       // Emerald success
+      sapphire: '#3b82f6',      // Sapphire blue
+      amethyst: '#8b5cf6',      // Amethyst purple
     },
-    
-    // Gray scale system (potřebné pro kompatibilitu)
-    gray: {
-      50: '#f8fafc',
-      100: '#f1f5f9',
-      200: '#e2e8f0',
-      300: '#cbd5e1',
-      400: '#94a3b8',
-      500: '#64748b',
-      600: '#475569',
-      700: '#334155',
-      800: '#1e293b',
-      850: '#0f172a',
-      900: '#020617',
+
+    // Glassmorphism surfaces
+    glass: {
+      surface: 'rgba(255, 255, 255, 0.08)',
+      surfaceHover: 'rgba(255, 255, 255, 0.12)',
+      border: 'rgba(255, 255, 255, 0.15)',
+      borderHover: 'rgba(255, 255, 255, 0.25)',
     },
-    
-    // Accent system (kvůli styled.d.ts)
-    accent: {
-      main: '#8b5cf6',
-      muted: 'rgba(139, 92, 246, 0.1)',
+
+    // Background system - FIX: Add missing backgrounds!
+    background: {
+      primary: '#0f0f23',       // Dark midnight
+      secondary: '#1a1a2e',     // Rich charcoal 
+      surface: '#16213e',       // Steel blue
+      elevated: 'rgba(255, 255, 255, 0.05)',
     },
-    
-    // Legacy color names pro backward compatibility
-    textSecondary: '#475569',  // Warm grey
-    textMuted: '#94a3b8',
-    textInverse: '#ffffff',
-    
-    // Background system
-    background: '#fefefe',     // Pure white
-    surface: '#ffffff',
-    surfaceHover: '#f8fafc',   
-    surfaceElevated: '#ffffff',
-    surfaceGlass: 'rgba(255, 255, 255, 0.8)',
-    
-    // Border system
-    border: 'rgba(148, 163, 184, 0.2)',
-    borderHover: 'rgba(148, 163, 184, 0.4)',
-    borderAccent: 'rgba(139, 92, 246, 0.3)',
-    
-    // Production status - cinematic
-    development: '#8b5cf6',     // Purple - imagination
-    preProduction: '#06b6d4',   // Cyan - planning
-    production: '#f97316',      // Orange - action!
-    postProduction: '#ef4444',  // Red - intensity
-    completed: '#10b981',       // Green - success
-    cancelled: '#64748b',       // Grey - neutral
-    
-    // Cinematic gradients
+
+    // Gradient system
     gradients: {
-      hero: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #8b5cf6 100%)',
-      sunset: 'linear-gradient(135deg, #f97316 0%, #ef4444 50%, #8b5cf6 100%)',
-      ocean: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 50%, #8b5cf6 100%)',
-      success: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
-      glass: 'linear-gradient(145deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.6) 100%)',
-      card: 'linear-gradient(145deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.4) 100%)',
-      text: 'linear-gradient(135deg, #f97316 0%, #8b5cf6 100%)',
-    }
+      primary: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      cinema: 'linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #8b5cf6 100%)',
+      golden: 'linear-gradient(135deg, #eab308 0%, #f59e0b 100%)',
+      ruby: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+      emerald: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+      midnight: 'linear-gradient(135deg, #0f0f23 0%, #1a1a2e 100%)',
+    },
+
+    // Text hierarchy
+    text: {
+      primary: '#f8fafc',       // Pure white text
+      secondary: '#cbd5e1',     // Light grey
+      muted: '#94a3b8',         // Muted grey
+      accent: '#667eea',        // Accent blue
+      warning: '#eab308',       // Warning gold
+      danger: '#ef4444',        // Danger red
+      success: '#10b981',       // Success green
+    },
+
+    // Status colors
+    status: {
+      prep: '#eab308',          // Golden prep
+      shoot: '#10b981',         // Green shooting
+      post: '#8b5cf6',          // Purple post
+      wrap: '#ef4444',          // Red wrap
+    },
   },
-  
-  // Fonts pro styled.d.ts kompatibilitu
-  fonts: {
-    display: '"Space Grotesk", "Inter", sans-serif',
-    body: '"Inter", -apple-system, BlinkMacSystemFont, sans-serif',
-  },
-  
-  // Sizes pro styled.d.ts kompatibilitu
-  sizes: {
-    h1: '2.5rem',
-    h2: '2rem',
-    h3: '1.75rem',
-    h4: '1.5rem',
-    h5: '1.25rem',
-    h6: '1.125rem',
-  },
-  
-  spacing: {
-    xs: '0.25rem',    // 4px
-    sm: '0.5rem',     // 8px  
-    md: '1rem',       // 16px
-    lg: '1.5rem',     // 24px
-    xl: '2rem',       // 32px
-    '2xl': '3rem',    // 48px
-    '3xl': '4rem',    // 64px
-    '4xl': '6rem',    // 96px
-    '5xl': '8rem',    // 128px
-    '6xl': '12rem',   // 192px
-  },
-  
+
+  // 📝 Typography
   typography: {
     fontFamily: {
-      // Primary - modern sans
-      sans: '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      // Display - dramatic headers
-      display: '"Space Grotesk", "Inter", sans-serif',
-      // Mono - technical details
-      mono: '"JetBrains Mono", "Fira Code", Monaco, monospace',
-      // Elegant - for special content
-      elegant: '"Manrope", "Inter", sans-serif',
+      body: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+      heading: "'Space Grotesk', -apple-system, BlinkMacSystemFont, sans-serif", 
+      mono: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
+      accent: "'Manrope', -apple-system, BlinkMacSystemFont, sans-serif",
     },
+
     fontSize: {
       xs: '0.75rem',     // 12px
-      sm: '0.875rem',    // 14px
+      sm: '0.875rem',    // 14px  
       base: '1rem',      // 16px
       lg: '1.125rem',    // 18px
       xl: '1.25rem',     // 20px
@@ -147,156 +79,132 @@ export const Theme = {
       '3xl': '1.875rem', // 30px
       '4xl': '2.25rem',  // 36px
       '5xl': '3rem',     // 48px
-      '6xl': '3.75rem',  // 60px
-      '7xl': '4.5rem',   // 72px
-      '8xl': '6rem',     // 96px
-      '9xl': '8rem',     // 128px
     },
+
     fontWeight: {
-      thin: 100,
-      extralight: 200,
       light: 300,
       normal: 400,
       medium: 500,
       semibold: 600,
       bold: 700,
       extrabold: 800,
-      black: 900,
     },
+
     lineHeight: {
-      none: 1,
       tight: 1.25,
-      snug: 1.375,
       normal: 1.5,
-      relaxed: 1.625,
+      relaxed: 1.75,
       loose: 2,
+      none: 1,
     },
-    letterSpacing: {
-      tighter: '-0.05em',
-      tight: '-0.025em', 
-      normal: '0em',
-      wide: '0.025em',
-      wider: '0.05em',
-      widest: '0.1em',
-    }
   },
-  
+
+  // 📏 Spacing
+  spacing: {
+    1: '0.25rem',    // 4px
+    2: '0.5rem',     // 8px
+    3: '0.75rem',    // 12px
+    4: '1rem',       // 16px
+    5: '1.25rem',    // 20px
+    6: '1.5rem',     // 24px
+    8: '2rem',       // 32px
+    10: '2.5rem',    // 40px
+    12: '3rem',      // 48px
+    16: '4rem',      // 64px
+    20: '5rem',      // 80px
+    24: '6rem',      // 96px
+  },
+
+  // 🔲 Border Radius
+  borderRadius: {
+    none: '0',
+    sm: '0.125rem',
+    md: '0.375rem',
+    lg: '0.5rem',
+    xl: '0.75rem',
+    '2xl': '1rem',
+    '3xl': '1.5rem',
+    full: '9999px',
+  },
+
+  // 🌊 Shadows
   shadows: {
-    // Basic shadows pro styled.d.ts kompatibilitu
-    sm: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-    md: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-    lg: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-    xl: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-    '2xl': '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-    inner: 'inset 0 2px 4px 0 rgba(0, 0, 0, 0.06)',
-    
-    // Cinematic colored shadows
-    primary: '0 20px 40px rgba(249, 115, 22, 0.3), 0 8px 16px rgba(249, 115, 22, 0.1)',
-    secondary: '0 20px 40px rgba(30, 27, 75, 0.3), 0 8px 16px rgba(30, 27, 75, 0.1)',
-    accent: '0 20px 40px rgba(139, 92, 246, 0.3), 0 8px 16px rgba(139, 92, 246, 0.1)',
-    
-    // Glass effects
-    glass: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
-    glassSm: '0 4px 16px 0 rgba(31, 38, 135, 0.2)',
-    glassLg: '0 16px 64px 0 rgba(31, 38, 135, 0.5)',
-    
-    // Glow effects
-    glow: '0 0 20px rgba(249, 115, 22, 0.4)',
-    glowAccent: '0 0 20px rgba(139, 92, 246, 0.4)',
-    glowSuccess: '0 0 20px rgba(16, 185, 129, 0.4)',
+    cinema: '0 25px 50px -12px rgba(0, 0, 0, 0.8)',
+    glow: '0 0 20px rgba(102, 126, 234, 0.4)',
+    glowHover: '0 0 30px rgba(102, 126, 234, 0.6)',
+    lg: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+    xl: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
   },
-  
+
+  // ⏱️ Transitions
   transitions: {
-    fast: '0.15s cubic-bezier(0.4, 0, 0.2, 1)',
-    normal: '0.25s cubic-bezier(0.4, 0, 0.2, 1)', 
-    slow: '0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-    slowest: '0.75s cubic-bezier(0.4, 0, 0.2, 1)',
-    
-    // Cinematic easing
-    bounce: '0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55)',
-    spring: '0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-    dramatic: '0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+    fast: '0.15s ease',
+    normal: '0.3s ease', 
+    slow: '0.5s ease',
+    cinema: '0.3s cubic-bezier(0.19, 1, 0.22, 1)',
   },
-  
+
+  // 📱 Breakpoints
   breakpoints: {
     sm: '640px',
     md: '768px',
-    lg: '1024px', 
+    lg: '1024px',
     xl: '1280px',
     '2xl': '1536px',
-    '3xl': '1920px',
   },
-  
-  borderRadius: {
-    none: '0',
-    sm: '0.125rem',    // 2px
-    md: '0.375rem',    // 6px  
-    lg: '0.5rem',      // 8px
-    xl: '0.75rem',     // 12px
-    '2xl': '1rem',     // 16px
-    '3xl': '1.5rem',   // 24px
-    '4xl': '2rem',     // 32px
-    full: '9999px',
-  },
-  
+
+  // 🔢 Z-Index Scale
   zIndex: {
-    hide: -1,
+    hide: '-1',
     auto: 'auto',
-    base: 0,
-    docked: 10,
-    dropdown: 1000,
-    sticky: 1100,
-    banner: 1200,
-    overlay: 1300,
-    modal: 1400,
-    popover: 1500,
-    skipLink: 1600,
-    toast: 1700,
-    tooltip: 1800,
-    cursor: 9999,
+    base: '0',
+    docked: '10',
+    dropdown: '1000',
+    sticky: '1100',
+    banner: '1200',
+    overlay: '1300',
+    modal: '1400',
+    popover: '1500',
+    skipLink: '1600',
+    toast: '1700',
+    tooltip: '1800',
   },
-  
-  // Glass morphism system
-  glass: {
-    light: {
-      background: 'rgba(255, 255, 255, 0.25)',
-      border: 'rgba(255, 255, 255, 0.18)',
-      backdrop: 'blur(16px) saturate(180%)',
-    },
-    medium: {
-      background: 'rgba(255, 255, 255, 0.15)',
-      border: 'rgba(255, 255, 255, 0.1)',
-      backdrop: 'blur(24px) saturate(160%)',
-    },
-    heavy: {
-      background: 'rgba(255, 255, 255, 0.1)',
-      border: 'rgba(255, 255, 255, 0.05)',
-      backdrop: 'blur(32px) saturate(200%)',
-    }
+
+  // 🌀 Animation Curves
+  animation: {
+    fadeIn: 'fadeIn 0.6s cubic-bezier(0.19, 1, 0.22, 1) forwards',
+    slideUp: 'slideUp 0.6s cubic-bezier(0.19, 1, 0.22, 1) forwards',
+    scaleIn: 'scaleIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards',
+    pulse: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+    spin: 'spin 1s linear infinite',
+    ping: 'ping 1s cubic-bezier(0, 0, 0.2, 1) infinite',
+    gradientShift: 'gradientShift 6s ease-in-out infinite',
+    float: 'float 6s ease-in-out infinite',
+    glow: 'glow 2s ease-in-out infinite alternate',
   },
-  
-  // Blur effects
-  blur: {
-    sm: 'blur(4px)',
-    md: 'blur(8px)', 
-    lg: 'blur(16px)',
-    xl: 'blur(24px)',
-    '2xl': 'blur(40px)',
-    '3xl': 'blur(64px)',
-  },
-  
-  // Cinema industry specific
+
+  // 🎬 Cinema-specific Design Tokens
   cinema: {
-    golden: '#f59e0b',         // Golden hour
-    filmRed: '#ef4444',        // Film reel red
-    stageBlue: '#3b82f6',      // Stage lighting  
-    spotlightYellow: '#eab308', // Spotlight
-    filmNoir: '#0f172a',       // Classic noir
-    vintage: '#92400e',        // Vintage film
-    neon: '#8b5cf6',          // Neon signs
-    chrome: '#e2e8f0',        // Chrome/metal
-  }
+    blur: {
+      sm: 'blur(10px)',
+      md: 'blur(20px)',
+      lg: 'blur(40px)',
+      xl: 'blur(60px)',
+    },
+
+    backdrop: {
+      light: 'blur(20px) saturate(150%)',
+      medium: 'blur(30px) saturate(180%)',
+      heavy: 'blur(60px) saturate(200%)',
+    },
+
+    aspect: {
+      cinema: '2.39 / 1',      // Cinemascope
+      widescreen: '16 / 9',    // Standard widescreen
+      academy: '4 / 3',        // Academy ratio
+      square: '1 / 1',         // Square
+    },
+  },
 };
 
 export type Theme = typeof Theme;
-export default Theme;

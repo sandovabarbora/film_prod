@@ -38,14 +38,10 @@ class CrewMemberListSerializer(serializers.ModelSerializer):
 class CrewMemberDetailSerializer(serializers.ModelSerializer):
     """Detailed serializer with all info"""
     primary_position = PositionSerializer(read_only=True)
-    primary_position_id = serializers.UUIDField(write_only=True, required=False)
     secondary_positions = PositionSerializer(many=True, read_only=True)
-    secondary_position_ids = serializers.ListField(
-        child=serializers.UUIDField(),
-        write_only=True,
-        required=False
-    )
     current_assignments = serializers.SerializerMethodField()
+    display_name = serializers.CharField(read_only=True)
+    full_name = serializers.CharField(read_only=True)
     
     class Meta:
         model = CrewMember
@@ -53,98 +49,119 @@ class CrewMemberDetailSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at', 'updated_at']
     
     def get_current_assignments(self, obj):
-        active = obj.assignments.filter(
-            status__in=['confirmed', 'pending', 'tentative']
-        ).select_related('production', 'position')
-        return CrewAssignmentListSerializer(active, many=True).data
+        assignments = obj.assignments.filter(
+            status__in=['confirmed', 'tentative']
+        ).select_related('production')[:5]
+        return CrewAssignmentListSerializer(assignments, many=True).data
+
+class CrewMemberCreateUpdateSerializer(serializers.ModelSerializer):
+    """Serializer pro vytváření a aktualizaci crew memberů"""
+    primary_position_id = serializers.UUIDField(write_only=True, required=False, allow_null=True)
+    primary_position = PositionSerializer(read_only=True)
+    
+    # Availability fields
+    available_from = serializers.DateField(required=False, allow_null=True)
+    available_to = serializers.DateField(required=False, allow_null=True)
+    
+    class Meta:
+        model = CrewMember
+        fields = [
+            'id', 'first_name', 'last_name', 'preferred_name', 'email',
+            'phone_primary', 'phone_secondary', 
+            'emergency_contact_name', 'emergency_contact_phone',
+            'primary_position', 'primary_position_id',
+            'daily_rate', 'union_member', 'union_number',
+            'has_vehicle', 'dietary_restrictions', 'shirt_size',
+            'status', 'notes', 'available_from', 'available_to',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
     
     def create(self, validated_data):
-        position_id = validated_data.pop('primary_position_id', None)
-        secondary_ids = validated_data.pop('secondary_position_ids', [])
+        primary_position_id = validated_data.pop('primary_position_id', None)
+        available_from = validated_data.pop('available_from', None)
+        available_to = validated_data.pop('available_to', None)
         
         crew_member = CrewMember.objects.create(**validated_data)
         
-        if position_id:
-            crew_member.primary_position_id = position_id
-            crew_member.save()
+        if primary_position_id:
+            try:
+                position = Position.objects.get(id=primary_position_id)
+                crew_member.primary_position = position
+                crew_member.save()
+            except Position.DoesNotExist:
+                pass
         
-        if secondary_ids:
-            crew_member.secondary_positions.set(secondary_ids)
+        # Note: available_from/available_to by se měly implementovat jako separate model
+        # Pro teď je ignorujeme, ale struktura je připravená
         
         return crew_member
     
     def update(self, instance, validated_data):
-        position_id = validated_data.pop('primary_position_id', None)
-        secondary_ids = validated_data.pop('secondary_position_ids', None)
+        primary_position_id = validated_data.pop('primary_position_id', None)
+        available_from = validated_data.pop('available_from', None)
+        available_to = validated_data.pop('available_to', None)
         
-        if position_id:
-            validated_data['primary_position_id'] = position_id
-        
+        # Update basic fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+        
+        # Update position if provided
+        if primary_position_id:
+            try:
+                position = Position.objects.get(id=primary_position_id)
+                instance.primary_position = position
+            except Position.DoesNotExist:
+                pass
+        
         instance.save()
-        
-        if secondary_ids is not None:
-            instance.secondary_positions.set(secondary_ids)
-        
         return instance
 
+    def validate_email(self, value):
+        """Check if email is unique"""
+        if self.instance and self.instance.email == value:
+            return value
+        
+        if CrewMember.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Crew member with this email already exists.")
+        
+        return value
+
+    def validate(self, data):
+        """Cross-field validation"""
+        available_from = data.get('available_from')
+        available_to = data.get('available_to')
+        
+        if available_from and available_to and available_from > available_to:
+            raise serializers.ValidationError({
+                'available_to': 'End date must be after start date.'
+            })
+        
+        return data
+
 class CrewAssignmentListSerializer(serializers.ModelSerializer):
+    """Lightweight serializer for lists"""
     crew_member_name = serializers.CharField(source='crew_member.display_name', read_only=True)
+    production_title = serializers.CharField(source='production.title', read_only=True)
     position_title = serializers.CharField(source='position.title', read_only=True)
     department = serializers.CharField(source='position.department.name', read_only=True)
-    production_title = serializers.CharField(source='production.title', read_only=True)
     
     class Meta:
         model = CrewAssignment
         fields = [
-            'id', 'crew_member_name', 'position_title', 'department',
-            'production_title', 'start_date', 'end_date', 'status', 'daily_rate'
+            'id', 'crew_member_name', 'production_title', 'position_title',
+            'department', 'start_date', 'end_date', 'daily_rate', 'status'
         ]
 
 class CrewAssignmentDetailSerializer(serializers.ModelSerializer):
+    """Detailed serializer with all info"""
     crew_member = CrewMemberListSerializer(read_only=True)
-    crew_member_id = serializers.UUIDField(write_only=True)
     position = PositionSerializer(read_only=True)
-    position_id = serializers.IntegerField(write_only=True)
-    days_worked = serializers.SerializerMethodField()
-    total_earned = serializers.SerializerMethodField()
     
     class Meta:
         model = CrewAssignment
         fields = '__all__'
         read_only_fields = ['id', 'created_at', 'updated_at']
-    
-    def get_days_worked(self, obj):
-        # This would connect to schedule/timesheet data
-        return 0
-    
-    def get_total_earned(self, obj):
-        days = self.get_days_worked(obj)
-        return float(obj.daily_rate * days) if obj.daily_rate else 0
-    
-    def validate(self, data):
-        # Check for conflicts
-        crew_member_id = data.get('crew_member_id') or self.instance.crew_member_id
-        production_id = data.get('production') or self.instance.production
-        position_id = data.get('position_id') or self.instance.position_id
-        
-        # Validate no duplicate assignments
-        qs = CrewAssignment.objects.filter(
-            crew_member_id=crew_member_id,
-            production=production_id,
-            position_id=position_id
-        )
-        
-        if self.instance:
-            qs = qs.exclude(pk=self.instance.pk)
-        
-        if qs.exists():
-            raise serializers.ValidationError(
-                "This crew member already has this position on this production"
-            )
-        
-        return data
 
 class CallSheetListSerializer(serializers.ModelSerializer):
     production_title = serializers.CharField(source='production.title', read_only=True)
@@ -160,85 +177,52 @@ class CallSheetListSerializer(serializers.ModelSerializer):
     def get_crew_count(self, obj):
         return obj.crew_calls.count()
 
-class CrewCallSerializer(serializers.ModelSerializer):
-    crew_member_name = serializers.CharField(source='crew_member.display_name', read_only=True)
-    position = serializers.CharField(source='crew_member.primary_position.title', read_only=True)
-    department = serializers.CharField(source='crew_member.primary_position.department.name', read_only=True)
-    phone = serializers.CharField(source='crew_member.phone_primary', read_only=True)
-    
-    class Meta:
-        model = CrewCall
-        fields = '__all__'
-
 class CallSheetDetailSerializer(serializers.ModelSerializer):
-    crew_calls = CrewCallSerializer(many=True, read_only=True)
-    scenes_scheduled = serializers.SerializerMethodField()
-    total_pages = serializers.SerializerMethodField()
+    crew_calls = serializers.SerializerMethodField()
     
     class Meta:
         model = CallSheet
         fields = '__all__'
         read_only_fields = ['id', 'created_at', 'updated_at']
     
-    def get_scenes_scheduled(self, obj):
-        # This would connect to schedule data
-        return []
-    
-    def get_total_pages(self, obj):
-        # Calculate from scheduled scenes
-        return 0
+    def get_crew_calls(self, obj):
+        calls = obj.crew_calls.select_related('crew_member').all()
+        return CrewCallSerializer(calls, many=True).data
 
 class CallSheetCreateSerializer(serializers.ModelSerializer):
-    """Special serializer for creating call sheets with crew calls"""
-    crew_calls = serializers.ListField(
-        child=serializers.DictField(),
-        write_only=True,
-        required=False
-    )
-    
     class Meta:
         model = CallSheet
         fields = '__all__'
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+class CrewCallSerializer(serializers.ModelSerializer):
+    crew_member_name = serializers.CharField(source='crew_member.display_name', read_only=True)
     
-    def create(self, validated_data):
-        crew_calls_data = validated_data.pop('crew_calls', [])
-        call_sheet = CallSheet.objects.create(**validated_data)
-        
-        # Create crew calls
-        for call_data in crew_calls_data:
-            CrewCall.objects.create(
-                call_sheet=call_sheet,
-                **call_data
-            )
-        
-        return call_sheet
+    class Meta:
+        model = CrewCall
+        fields = '__all__'
 
 class CharacterSerializer(serializers.ModelSerializer):
     actor_name = serializers.CharField(source='actor.display_name', read_only=True)
-    scenes = serializers.SerializerMethodField()
     
     class Meta:
         model = Character
         fields = '__all__'
-    
-    def get_scenes(self, obj):
-        # Get scenes where this character appears
-        return obj.scene_set.values_list('scene_number', flat=True)
+        read_only_fields = ['id', 'created_at', 'updated_at']
 
+# Additional utility serializers
 class CrewAvailabilitySerializer(serializers.Serializer):
-    """Check crew availability for date range"""
     start_date = serializers.DateField()
     end_date = serializers.DateField()
-    position_id = serializers.IntegerField(required=False)
+    position_id = serializers.UUIDField(required=False)
     department_id = serializers.IntegerField(required=False)
     
     def validate(self, data):
-        if data['end_date'] < data['start_date']:
+        if data['start_date'] > data['end_date']:
             raise serializers.ValidationError("End date must be after start date")
         return data
 
 class CrewBulkImportSerializer(serializers.Serializer):
-    """Bulk import crew from CSV/Excel"""
     file = serializers.FileField()
     update_existing = serializers.BooleanField(default=False)
     

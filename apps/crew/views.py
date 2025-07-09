@@ -17,7 +17,7 @@ from .models import (
 )
 from .serializers import (
     DepartmentSerializer, PositionSerializer,
-    CrewMemberListSerializer, CrewMemberDetailSerializer,
+    CrewMemberListSerializer, CrewMemberDetailSerializer, CrewMemberCreateUpdateSerializer,
     CrewAssignmentListSerializer, CrewAssignmentDetailSerializer,
     CallSheetListSerializer, CallSheetDetailSerializer, CallSheetCreateSerializer,
     CrewCallSerializer, CharacterSerializer,
@@ -56,32 +56,84 @@ class CrewMemberViewSet(viewsets.ModelViewSet):
     ordering = ['last_name', 'first_name']
     
     def get_serializer_class(self):
-        if self.action == 'list':
+        """Vrátí správný serializer podle akce"""
+        if self.action in ['list']:
             return CrewMemberListSerializer
-        return CrewMemberDetailSerializer
+        elif self.action in ['create', 'update', 'partial_update']:
+            return CrewMemberCreateUpdateSerializer
+        else:
+            return CrewMemberDetailSerializer
     
     def get_queryset(self):
         queryset = super().get_queryset()
-        
-        # Filter by status
-        status = self.request.query_params.get('status')
-        if status:
-            queryset = queryset.filter(status=status)
         
         # Filter by department
         department_id = self.request.query_params.get('department')
         if department_id:
             queryset = queryset.filter(primary_position__department_id=department_id)
         
+        # Filter by status
+        status_param = self.request.query_params.get('status')
+        if status_param:
+            queryset = queryset.filter(status=status_param)
+        
         # Filter by position
         position_id = self.request.query_params.get('position')
         if position_id:
-            queryset = queryset.filter(
-                Q(primary_position_id=position_id) |
-                Q(secondary_positions__id=position_id)
-            ).distinct()
+            queryset = queryset.filter(primary_position_id=position_id)
         
         return queryset
+    
+    def create(self, request, *args, **kwargs):
+        """Vytvoří nového crew member s detailním error handlingem"""
+        serializer = self.get_serializer(data=request.data)
+        
+        if serializer.is_valid():
+            try:
+                crew_member = serializer.save()
+                response_serializer = CrewMemberDetailSerializer(crew_member)
+                return Response(
+                    response_serializer.data, 
+                    status=status.HTTP_201_CREATED
+                )
+            except Exception as e:
+                return Response(
+                    {'error': f'Failed to create crew member: {str(e)}'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            return Response(
+                {'errors': serializer.errors}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    @action(detail=False, methods=['get'])
+    def departments_with_positions(self, request):
+        """Vrátí departments s jejich pozicemi pro dropdown"""
+        departments = Department.objects.prefetch_related('positions').all()
+        data = []
+        
+        for dept in departments:
+            positions = [
+                {
+                    'id': str(pos.id),
+                    'title': pos.title,
+                    'level': pos.level,
+                    'daily_rate_min': pos.daily_rate_min,
+                    'daily_rate_max': pos.daily_rate_max
+                }
+                for pos in dept.positions.all()
+            ]
+            
+            data.append({
+                'id': dept.id,
+                'name': dept.name,
+                'abbreviation': dept.abbreviation,
+                'color_code': dept.color_code,
+                'positions': positions
+            })
+        
+        return Response(data)
     
     @action(detail=False, methods=['post'])
     def check_availability(self, request):
@@ -259,9 +311,9 @@ class CrewAssignmentViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(crew_member_id=crew_member_id)
         
         # Filter by status
-        status = self.request.query_params.get('status')
-        if status:
-            queryset = queryset.filter(status=status)
+        status_param = self.request.query_params.get('status')
+        if status_param:
+            queryset = queryset.filter(status=status_param)
         
         # Filter by date range
         date_from = self.request.query_params.get('date_from')
@@ -339,74 +391,11 @@ class CallSheetViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(date__lte=date_to)
         
         # Filter by status
-        status = self.request.query_params.get('status')
-        if status:
-            queryset = queryset.filter(status=status)
+        status_param = self.request.query_params.get('status')
+        if status_param:
+            queryset = queryset.filter(status=status_param)
         
         return queryset
-    
-    @action(detail=True, methods=['post'])
-    def approve(self, request, pk=None):
-        """Approve call sheet"""
-        call_sheet = self.get_object()
-        call_sheet.status = 'final'
-        call_sheet.approved_by = request.user
-        call_sheet.approved_at = timezone.now()
-        call_sheet.save()
-        
-        # TODO: Send notifications to crew
-        
-        return Response(CallSheetDetailSerializer(call_sheet).data)
-    
-    @action(detail=True, methods=['post'])
-    def duplicate(self, request, pk=None):
-        """Duplicate call sheet for another day"""
-        source = self.get_object()
-        new_date = request.data.get('date')
-        
-        if not new_date:
-            return Response(
-                {'error': 'date required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # Create new call sheet
-        new_call_sheet = CallSheet.objects.create(
-            production=source.production,
-            date=new_date,
-            shooting_day=source.shooting_day + 1,
-            general_call_time=source.general_call_time,
-            shooting_call=source.shooting_call,
-            base_camp_location=source.base_camp_location,
-            nearest_hospital=source.nearest_hospital,
-            parking_instructions=source.parking_instructions,
-            status='draft'
-        )
-        
-        # Duplicate crew calls
-        for crew_call in source.crew_calls.all():
-            CrewCall.objects.create(
-                call_sheet=new_call_sheet,
-                crew_member=crew_call.crew_member,
-                call_time=crew_call.call_time,
-                status=crew_call.status,
-                report_to=crew_call.report_to,
-                transport_provided=crew_call.transport_provided
-            )
-        
-        return Response(CallSheetDetailSerializer(new_call_sheet).data)
-    
-    @action(detail=True, methods=['get'])
-    def pdf(self, request, pk=None):
-        """Generate PDF call sheet"""
-        call_sheet = self.get_object()
-        
-        # TODO: Implement PDF generation
-        # For now, return URL where PDF would be
-        
-        return Response({
-            'pdf_url': f'/api/v1/crew/call-sheets/{pk}/download/'
-        })
 
 class CharacterViewSet(viewsets.ModelViewSet):
     queryset = Character.objects.select_related('production', 'actor')

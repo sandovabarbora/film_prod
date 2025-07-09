@@ -7,8 +7,8 @@ class Production(models.Model):
     """Hlavní produkce/film"""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     title = models.CharField(max_length=200)
-    director = models.CharField(max_length=100)
-    producer = models.CharField(max_length=100)
+    director = models.CharField(max_length=100, default='TBD')
+    producer = models.CharField(max_length=100, default='TBD')
     
     STATUS_CHOICES = [
         ('prep', 'Pre-production'),
@@ -21,6 +21,7 @@ class Production(models.Model):
     start_date = models.DateField()
     end_date = models.DateField()
     budget = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    location_primary = models.CharField(max_length=200, blank=True)
     
     script_version = models.CharField(max_length=20, default='1.0')
     script_file = models.FileField(upload_to='scripts/', null=True, blank=True)
@@ -104,54 +105,56 @@ class Shot(models.Model):
     shot_number = models.CharField(max_length=10)  # "1A", "2B", "Master" atd.
     
     SHOT_TYPE_CHOICES = [
-        ('MASTER', 'Master Shot'),
-        ('CU', 'Close Up'),
-        ('MCU', 'Medium Close Up'),
-        ('MS', 'Medium Shot'),
         ('WS', 'Wide Shot'),
+        ('MS', 'Medium Shot'),
+        ('CU', 'Close Up'),
+        ('ECU', 'Extreme Close Up'),
         ('OTS', 'Over The Shoulder'),
         ('POV', 'Point of View'),
         ('INSERT', 'Insert'),
+        ('MASTER', 'Master Shot'),
+        ('TWO_SHOT', 'Two Shot'),
+        ('TRACKING', 'Tracking Shot'),
+        ('CRANE', 'Crane Shot'),
+        ('DRONE', 'Drone Shot'),
     ]
-    shot_type = models.CharField(max_length=10, choices=SHOT_TYPE_CHOICES)
+    shot_type = models.CharField(max_length=10, choices=SHOT_TYPE_CHOICES, default='MS')
     
-    description = models.TextField()
+    description = models.TextField(blank=True)
     camera_notes = models.TextField(blank=True)
-    lens = models.CharField(max_length=50, blank=True)
+    lighting_notes = models.TextField(blank=True)
     
     STATUS_CHOICES = [
+        ('not_shot', 'Not Shot'),
         ('setup', 'Setting Up'),
-        ('rehearsal', 'Rehearsal'),
+        ('rehearsal', 'Rehearsing'),
         ('rolling', 'Rolling'),
-        ('cut', 'Cut'),
-        ('moving_on', 'Moving On'),
         ('completed', 'Completed'),
     ]
-    status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='setup')
+    status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='not_shot')
     
-    takes_planned = models.IntegerField(default=1)
+    takes_planned = models.IntegerField(default=3)
     takes_completed = models.IntegerField(default=0)
     takes_good = models.IntegerField(default=0)
     
-    estimated_time = models.DurationField(null=True, blank=True)
-    actual_time = models.DurationField(null=True, blank=True)
+    estimated_duration = models.DurationField(null=True, blank=True)
+    actual_duration = models.DurationField(null=True, blank=True)
     
-    created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     
     class Meta:
-        ordering = ['shot_number']
+        ordering = ['scene', 'shot_number']
         unique_together = ['scene', 'shot_number']
     
     def __str__(self):
-        return f"{self.scene.scene_number}-{self.shot_number} ({self.shot_type})"
+        return f"Shot {self.shot_number} - {self.scene.scene_number}"
     
     @property
     def efficiency_ratio(self):
         """Poměr dobrých záběrů k celkovému počtu"""
-        if self.takes_completed > 0:
-            return round(self.takes_good / self.takes_completed, 2)
-        return 0
+        if self.takes_completed == 0:
+            return 0
+        return round((self.takes_good / self.takes_completed) * 100, 1)
 
 class Take(models.Model):
     """Jednotlivý take/pokus"""
@@ -160,23 +163,21 @@ class Take(models.Model):
     
     RESULT_CHOICES = [
         ('good', 'Good'),
-        ('ng', 'No Good'),
-        ('maybe', 'Maybe'),
         ('print', 'Print'),
+        ('ng', 'No Good'),
+        ('hold', 'Hold'),
+        ('safety', 'Safety'),
     ]
-    result = models.CharField(max_length=10, choices=RESULT_CHOICES)
+    result = models.CharField(max_length=10, choices=RESULT_CHOICES, default='ng')
     
     director_notes = models.TextField(blank=True)
     script_supervisor_notes = models.TextField(blank=True)
     
-    timecode_in = models.TimeField(null=True, blank=True)
-    timecode_out = models.TimeField(null=True, blank=True)
-    
     recorded_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
-        ordering = ['take_number']
+        ordering = ['shot', 'take_number']
         unique_together = ['shot', 'take_number']
     
     def __str__(self):
-        return f"{self.shot} - Take {self.take_number} ({self.result})"
+        return f"Take {self.take_number} - {self.shot} ({self.result})"

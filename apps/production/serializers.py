@@ -9,7 +9,8 @@ class ProductionListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Production
         fields = ['id', 'title', 'director', 'producer', 'status', 'start_date', 
-                 'end_date', 'scenes_count', 'completion_percentage', 'created_at']
+                 'end_date', 'budget', 'location_primary', 'scenes_count', 
+                 'completion_percentage', 'created_at']
     
     def get_scenes_count(self, obj):
         return obj.scenes.count()
@@ -70,6 +71,7 @@ class SceneListSerializer(serializers.ModelSerializer):
         return obj.shots.count()
 
 class ProductionDetailSerializer(serializers.ModelSerializer):
+    """Full serializer pro detail view s relationships"""
     locations = LocationSerializer(many=True, read_only=True)
     scenes = SceneListSerializer(many=True, read_only=True)
     
@@ -82,7 +84,15 @@ class ProductionDetailSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Production
-        fields = '__all__'
+        fields = [
+            'id', 'title', 'director', 'producer', 'status', 
+            'start_date', 'end_date', 'budget', 'location_primary',
+            'script_version', 'script_file', 'created_at', 'updated_at',
+            'locations', 'scenes',
+            'total_scenes', 'completed_scenes', 'total_shots', 
+            'completed_shots', 'total_pages'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
     
     def get_total_scenes(self, obj):
         return obj.scenes.count()
@@ -97,34 +107,74 @@ class ProductionDetailSerializer(serializers.ModelSerializer):
         return Shot.objects.filter(scene__production=obj, status='completed').count()
     
     def get_total_pages(self, obj):
-        return sum(scene.estimated_pages for scene in obj.scenes.all())
+        return sum(scene.estimated_pages or 0 for scene in obj.scenes.all())
 
-class LiveDashboardSerializer(serializers.Serializer):
-    """Real-time dashboard data"""
-    production_id = serializers.UUIDField()
-    current_scene = serializers.CharField(allow_blank=True)
-    current_shot = serializers.CharField(allow_blank=True)
-    current_status = serializers.CharField()
+class ProductionCreateUpdateSerializer(serializers.ModelSerializer):
+    """Simplified serializer pro CREATE/UPDATE - podporuje crew_ids"""
     
-    # Progress today
-    scenes_completed_today = serializers.IntegerField()
-    shots_completed_today = serializers.IntegerField()
-    pages_shot_today = serializers.DecimalField(max_digits=5, decimal_places=2)
+    # 🎯 Crew support - přijme crew_ids ale neuloží je přímo (pro future implementation)
+    crew_ids = serializers.ListField(
+        child=serializers.CharField(),
+        required=False,
+        write_only=True,
+        help_text="List of crew member IDs to assign to production"
+    )
     
-    # Timing
-    day_start = serializers.TimeField()
-    current_time = serializers.TimeField()
-    estimated_wrap = serializers.TimeField()
-    behind_schedule_minutes = serializers.IntegerField()
+    class Meta:
+        model = Production
+        fields = [
+            'id', 'title', 'director', 'producer', 'status', 
+            'start_date', 'end_date', 'budget', 'location_primary',
+            'script_version', 'crew_ids'
+        ]
+        read_only_fields = ['id']
+        
+    def create(self, validated_data):
+        # 🎯 Odstraníme crew_ids z validated_data (pro future crew assignment)
+        crew_ids = validated_data.pop('crew_ids', [])
+        
+        # Pokud není zadán director/producer, použijeme defaults
+        if not validated_data.get('director'):
+            validated_data['director'] = 'TBD'
+        if not validated_data.get('producer'):
+            validated_data['producer'] = 'TBD'
+            
+        production = Production.objects.create(**validated_data)
+        
+        # 🎯 TODO: Implement crew assignment when crew app is ready
+        if crew_ids:
+            print(f"🎯 Future crew assignment: {crew_ids} to production {production.id}")
+        
+        # Pokud máme location_primary, vytvoříme Location záznam
+        if validated_data.get('location_primary'):
+            Location.objects.create(
+                production=production,
+                name=validated_data['location_primary'],
+                address=validated_data['location_primary']
+            )
+        
+        return production
     
-    # Next up
-    next_scene = serializers.CharField(allow_blank=True)
-    next_estimated_time = serializers.TimeField(allow_null=True)
-    
-    # Weather
-    current_temperature = serializers.IntegerField(allow_null=True)
-    weather_description = serializers.CharField(allow_blank=True)
-    
-    # Crew status
-    crew_on_set = serializers.IntegerField()
-    crew_total = serializers.IntegerField()
+    def update(self, instance, validated_data):
+        # 🎯 Odstraníme crew_ids (pro future implementation)
+        crew_ids = validated_data.pop('crew_ids', [])
+        
+        # Update production
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        # 🎯 TODO: Update crew assignment
+        if crew_ids:
+            print(f"🎯 Future crew update: {crew_ids} for production {instance.id}")
+        
+        # Update primary location pokud zadána
+        location_primary = validated_data.get('location_primary')
+        if location_primary:
+            primary_location, created = Location.objects.get_or_create(
+                production=instance,
+                name=location_primary,
+                defaults={'address': location_primary}
+            )
+        
+        return instance

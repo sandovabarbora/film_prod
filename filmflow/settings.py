@@ -1,6 +1,8 @@
+# filmflow/settings.py
 import os
 from pathlib import Path
 from decouple import config
+from datetime import timedelta
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -19,15 +21,16 @@ DJANGO_APPS = [
 
 THIRD_PARTY_APPS = [
     'rest_framework',
+    'rest_framework_simplejwt',  # JWT pro autentifikaci
+    'rest_framework_simplejwt.token_blacklist',  # Token blacklisting
     'corsheaders',
     'channels',
-    'rest_framework_simplejwt',
     'django_extensions',
 ]
 
 LOCAL_APPS = [
+    'apps.auth',  # Auth app první
     'apps.production',
-    'apps.auth',  # <-- PŘIDAT TOTO
     'apps.crew',
     'apps.schedule',
     'apps.notifications',
@@ -38,7 +41,7 @@ LOCAL_APPS = [
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # 🔥 TOTO MUSÍ BÝT PRVNÍ!
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -46,9 +49,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
-    'django.middleware.common.CommonMiddleware',
 ]
+
 
 ROOT_URLCONF = 'filmflow.urls'
 
@@ -71,7 +73,7 @@ TEMPLATES = [
 WSGI_APPLICATION = 'filmflow.wsgi.application'
 ASGI_APPLICATION = 'filmflow.asgi.application'
 
-# Database - můžeme začít s SQLite pro rychlý start
+# Database
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -79,7 +81,7 @@ DATABASES = {
     }
 }
 
-# Pro production PostgreSQL 
+# PostgreSQL pro production
 if not DEBUG or config('USE_POSTGRES', default=False, cast=bool):
     DATABASES['default'] = {
         'ENGINE': 'django.db.backends.postgresql',
@@ -90,69 +92,75 @@ if not DEBUG or config('USE_POSTGRES', default=False, cast=bool):
         'PORT': config('DB_PORT', default='5432'),
     }
 
-# Redis pro channels a cache
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
-        'CONFIG': {
-            'hosts': [('127.0.0.1', 6379)],
-        },
-    },
-}
-
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
-        'LOCATION': 'redis://127.0.0.1:6379/1',
-    }
-}
-
-# REST Framework
+# REST Framework s JWT
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.SessionAuthentication',
-        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework_simplejwt.authentication.JWTAuthentication',  # JWT první
+        'rest_framework.authentication.SessionAuthentication',  # Session pro admin
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+    ],
+    'EXCEPTION_HANDLER': 'rest_framework.views.exception_handler',
 }
 
 # JWT Settings
-from datetime import timedelta
-
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN': True,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+    'USER_AUTHENTICATION_RULE': 'rest_framework_simplejwt.authentication.default_user_authentication_rule',
+    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
+    'TOKEN_TYPE_CLAIM': 'token_type',
+    'TOKEN_USER_CLASS': 'rest_framework_simplejwt.models.TokenUser',
+    'JTI_CLAIM': 'jti',
+    'SLIDING_TOKEN_REFRESH_EXP_CLAIM': 'refresh_exp',
+    'SLIDING_TOKEN_LIFETIME': timedelta(minutes=5),
+    'SLIDING_TOKEN_REFRESH_LIFETIME': timedelta(days=1),
 }
+
+# CORS pro frontend
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8080",  # backup port
+]
+
+CORS_ALLOW_CREDENTIALS = True
+
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+    CORS_ALLOW_HEADERS = [
+        'accept',
+        'accept-encoding',
+        'authorization',
+        'content-type',
+        'dnt',
+        'origin',
+        'user-agent',
+        'x-csrftoken',
+        'x-requested-with',
+    ]
 
 # Media files
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
-# CORS pro Vue.js development
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "http://localhost:8080",
-]
 
-CORS_ALLOW_CREDENTIALS = True
-# Additional CORS settings for development
-if DEBUG:
-    CORS_ALLOW_ALL_ORIGINS = True
-    CORS_ALLOW_CREDENTIALS = True
-    
-# Update REST_FRAMEWORK for better error handling
-REST_FRAMEWORK['DEFAULT_RENDERER_CLASSES'] = [
-    'rest_framework.renderers.JSONRenderer',
-]
-
-# Ensure JWT settings are correct
-SIMPLE_JWT['AUTH_HEADER_TYPES'] = ('Bearer',)
+# Static files
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = [BASE_DIR / 'static']
 
 # Internationalization
 LANGUAGE_CODE = 'cs-cz'
@@ -160,19 +168,9 @@ TIME_ZONE = 'Europe/Prague'
 USE_I18N = True
 USE_TZ = True
 
-# Static files
-STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_DIRS = [BASE_DIR / 'static']
-
-# Media files
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
-
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Logging pro production debugging
-import os
+# Logging
 os.makedirs(BASE_DIR / 'logs', exist_ok=True)
 
 LOGGING = {
